@@ -9,6 +9,7 @@ import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -21,6 +22,7 @@ import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
+import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +54,10 @@ public class DashboardJFrame extends JFrame {
     private JPanel contentPanel;
     private JPanel menuContainer;
     private JPanel configSubMenuPanel;
+    private CircularAvatar sidebarAvatar;
+    private JLabel lblSidebarUser;
+    private JLabel lblSidebarUserName;
+    private JLabel lblDashboardWelcome;
 
     private SideMenuItem itemDashboard;
     private SideMenuItem itemVentas;
@@ -129,6 +135,18 @@ public class DashboardJFrame extends JFrame {
     private String getSafeUserName() {
         if (currentUser != null && currentUser.getUserName() != null && !currentUser.getUserName().trim().isEmpty()) {
             return currentUser.getUserName().trim();
+        }
+
+        if (userName != null && !userName.trim().isEmpty()) {
+            return userName.trim();
+        }
+
+        return "Usuario Demo";
+    }
+
+    private String getSafeDisplayName() {
+        if (currentUser != null) {
+            return currentUser.getDisplayName();
         }
 
         if (userName != null && !userName.trim().isEmpty()) {
@@ -226,16 +244,21 @@ public class DashboardJFrame extends JFrame {
         logo.setPreferredSize(new Dimension(240, 48));
         logo.setMaximumSize(new Dimension(240, 48));
 
-        CircularAvatar avatar = new CircularAvatar(userName, loadProfileImage());
-        avatar.setAlignmentX(CENTER_ALIGNMENT);
-        avatar.setPreferredSize(new Dimension(88, 88));
-        avatar.setMaximumSize(new Dimension(88, 88));
-        avatar.setMinimumSize(new Dimension(88, 88));
+        sidebarAvatar = new CircularAvatar(getSafeDisplayName(), loadProfileImage());
+        sidebarAvatar.setAlignmentX(CENTER_ALIGNMENT);
+        sidebarAvatar.setPreferredSize(new Dimension(88, 88));
+        sidebarAvatar.setMaximumSize(new Dimension(88, 88));
+        sidebarAvatar.setMinimumSize(new Dimension(88, 88));
 
-        JLabel lblUser = new JLabel(userName);
-        lblUser.setAlignmentX(CENTER_ALIGNMENT);
-        lblUser.setFont(new Font("Segoe UI", Font.BOLD, 15));
-        lblUser.setForeground(whiteText);
+        lblSidebarUser = new JLabel(getSafeDisplayName());
+        lblSidebarUser.setAlignmentX(CENTER_ALIGNMENT);
+        lblSidebarUser.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        lblSidebarUser.setForeground(whiteText);
+
+        lblSidebarUserName = new JLabel("@" + getSafeUserName());
+        lblSidebarUserName.setAlignmentX(CENTER_ALIGNMENT);
+        lblSidebarUserName.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblSidebarUserName.setForeground(mutedText);
 
         JPanel onlinePanel = new JPanel();
         onlinePanel.setOpaque(false);
@@ -255,9 +278,11 @@ public class DashboardJFrame extends JFrame {
 
         header.add(logo);
         header.add(Box.createVerticalStrut(22));
-        header.add(avatar);
+        header.add(sidebarAvatar);
         header.add(Box.createVerticalStrut(10));
-        header.add(lblUser);
+        header.add(lblSidebarUser);
+        header.add(Box.createVerticalStrut(3));
+        header.add(lblSidebarUserName);
         header.add(Box.createVerticalStrut(4));
         header.add(onlinePanel);
 
@@ -455,7 +480,7 @@ public class DashboardJFrame extends JFrame {
         contentPanel.add(new RoleJPanel(), "ROLES");
         contentPanel.add(new LocationJPanel(), "UBICACION");
         contentPanel.add(new CatalogJPanel(), "CATALOGO");
-        contentPanel.add(createProfilePanel(), "PERFIL");
+        contentPanel.add(new ProfileJPanel(getSafeUserId(), this::handleProfileUpdated), "PERFIL");
 
         return contentPanel;
     }
@@ -471,12 +496,12 @@ public class DashboardJFrame extends JFrame {
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 34));
         lblTitle.setForeground(darkText);
 
-        JLabel lblWelcome = new JLabel("Bienvenido, " + userName);
-        lblWelcome.setFont(new Font("Segoe UI", Font.PLAIN, 17));
-        lblWelcome.setForeground(new Color(90, 90, 90));
+        lblDashboardWelcome = new JLabel("Bienvenido, " + getSafeDisplayName());
+        lblDashboardWelcome.setFont(new Font("Segoe UI", Font.PLAIN, 17));
+        lblDashboardWelcome.setForeground(new Color(90, 90, 90));
 
         header.add(lblTitle, BorderLayout.NORTH);
-        header.add(lblWelcome, BorderLayout.SOUTH);
+        header.add(lblDashboardWelcome, BorderLayout.SOUTH);
 
         JPanel cards = new JPanel(new GridLayout(2, 3, 22, 22));
         cards.setBackground(backgroundColor);
@@ -521,44 +546,6 @@ public class DashboardJFrame extends JFrame {
         return panel;
     }
 
-    private JPanel createProfilePanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(backgroundColor);
-
-        JPanel card = new JPanel();
-        card.setBackground(cardColor);
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(225, 225, 225), 1),
-                BorderFactory.createEmptyBorder(35, 35, 35, 35)
-        ));
-
-        JLabel lblTitle = new JLabel("Perfil");
-        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 32));
-        lblTitle.setForeground(darkText);
-        lblTitle.setAlignmentX(LEFT_ALIGNMENT);
-
-        JLabel lblUser = new JLabel("Usuario: " + userName);
-        lblUser.setFont(new Font("Segoe UI", Font.PLAIN, 17));
-        lblUser.setForeground(new Color(80, 80, 80));
-        lblUser.setAlignmentX(LEFT_ALIGNMENT);
-
-        JLabel lblInfo = new JLabel("Aqui podras mostrar o editar la informacion del usuario.");
-        lblInfo.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        lblInfo.setForeground(new Color(100, 100, 100));
-        lblInfo.setAlignmentX(LEFT_ALIGNMENT);
-
-        card.add(lblTitle);
-        card.add(Box.createVerticalStrut(20));
-        card.add(lblUser);
-        card.add(Box.createVerticalStrut(10));
-        card.add(lblInfo);
-
-        panel.add(card, BorderLayout.CENTER);
-
-        return panel;
-    }
-
     private JPanel createInfoCard(String title, String description) {
         JPanel card = new JPanel(new BorderLayout(0, 10));
         card.setBackground(cardColor);
@@ -587,7 +574,22 @@ public class DashboardJFrame extends JFrame {
         }
 
         cardLayout.show(contentPanel, sectionName);
+        refreshVisibleSection();
         setActiveMenuItem(activeItem);
+    }
+
+    private void refreshVisibleSection() {
+        for (Component component : contentPanel.getComponents()) {
+            if (!component.isVisible()) {
+                continue;
+            }
+
+            if (component instanceof SectionRefreshable refreshable) {
+                refreshable.refreshSectionData();
+            }
+
+            break;
+        }
     }
 
     private void setActiveMenuItem(SideMenuItem activeItem) {
@@ -644,6 +646,20 @@ public class DashboardJFrame extends JFrame {
     }
 
     private Image loadProfileImage() {
+        if (currentUser != null
+                && currentUser.getProfileImagePath() != null
+                && !currentUser.getProfileImagePath().trim().isEmpty()) {
+            try {
+                File imageFile = new File(currentUser.getProfileImagePath().trim());
+
+                if (imageFile.exists() && imageFile.isFile()) {
+                    return ImageIO.read(imageFile);
+                }
+            } catch (Exception e) {
+                System.out.println("No se pudo cargar la foto de perfil del usuario.");
+            }
+        }
+
         try {
             InputStream inputStream = getClass().getResourceAsStream("/Assets/profile.png");
 
@@ -656,6 +672,32 @@ public class DashboardJFrame extends JFrame {
         }
 
         return null;
+    }
+
+    private void handleProfileUpdated(User updatedUser) {
+        if (updatedUser == null) {
+            return;
+        }
+
+        this.currentUser = updatedUser;
+        this.userName = getSafeUserName();
+
+        if (lblSidebarUser != null) {
+            lblSidebarUser.setText(getSafeDisplayName());
+        }
+
+        if (lblSidebarUserName != null) {
+            lblSidebarUserName.setText("@" + getSafeUserName());
+        }
+
+        if (lblDashboardWelcome != null) {
+            lblDashboardWelcome.setText("Bienvenido, " + getSafeDisplayName());
+        }
+
+        if (sidebarAvatar != null) {
+            sidebarAvatar.setUserName(getSafeDisplayName());
+            sidebarAvatar.setProfileImage(loadProfileImage());
+        }
     }
 
     private static Icon buildIcon(FontAwesome icon, int size, Color color) {
@@ -732,8 +774,8 @@ public class DashboardJFrame extends JFrame {
 
     private static class CircularAvatar extends JPanel {
 
-        private final String userName;
-        private final Image profileImage;
+        private String userName;
+        private Image profileImage;
 
         public CircularAvatar(String userName, Image profileImage) {
             this.userName = userName == null || userName.trim().isEmpty()
@@ -742,6 +784,18 @@ public class DashboardJFrame extends JFrame {
 
             this.profileImage = profileImage;
             setOpaque(false);
+        }
+
+        public void setUserName(String userName) {
+            this.userName = userName == null || userName.trim().isEmpty()
+                    ? "U"
+                    : userName.trim();
+            repaint();
+        }
+
+        public void setProfileImage(Image profileImage) {
+            this.profileImage = profileImage;
+            repaint();
         }
 
         @Override

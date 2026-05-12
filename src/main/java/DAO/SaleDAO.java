@@ -7,7 +7,6 @@ import Models.SaleHistoryStats;
 import Models.SaleProductItem;
 import Models.SaleRanking;
 import Models.SelectOption;
-import java.math.BigDecimal;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.Date;
@@ -91,7 +90,7 @@ public class SaleDAO {
     }
 
     public Sale createSale(Sale sale) throws SQLException {
-        String sql = "{CALL sp_sale_create(?, ?, ?, ?, ?, ?, ?, ?)}";
+        String sql = "{CALL sp_sale_create(?, ?, ?, ?, ?, ?, ?)}";
 
         try (
             Connection connection = Database.getConnection();
@@ -100,17 +99,16 @@ public class SaleDAO {
             statement.setInt(1, sale.getIdUser());
             statement.setInt(2, sale.getIdPaymentMethod());
             statement.setString(3, sale.getDocumentKind());
-            statement.setString(4, sale.getCustomerName());
 
             if (sale.getCustomerDocumentTypeId() == null || sale.getCustomerDocumentTypeId() <= 0) {
-                statement.setNull(5, Types.INTEGER);
+                statement.setNull(4, Types.INTEGER);
             } else {
-                statement.setInt(5, sale.getCustomerDocumentTypeId());
+                statement.setInt(4, sale.getCustomerDocumentTypeId());
             }
 
-            statement.setString(6, sale.getCustomerDocumentNumber());
-            statement.setBigDecimal(7, sale.getPaidAmount());
-            statement.setString(8, buildDetailsJson(sale.getDetails()));
+            statement.setString(5, sale.getCustomerDocumentNumber());
+            statement.setDouble(6, sale.getPaidAmount().doubleValue());
+            statement.setString(7, buildDetailsJson(sale.getDetails()));
 
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
@@ -219,16 +217,19 @@ public class SaleDAO {
         return new SaleHistoryStats();
     }
 
-    public List<SaleRanking> getRanking(LocalDate dateFrom, LocalDate dateTo) throws SQLException {
-        String sql = "{CALL sp_sale_ranking(?, ?)}";
+    public List<SaleRanking> getRanking(String search, int idPaymentMethod, int idUser, LocalDate dateFrom, LocalDate dateTo) throws SQLException {
+        String sql = "{CALL sp_sale_ranking(?, ?, ?, ?, ?)}";
         List<SaleRanking> list = new ArrayList<>();
 
         try (
             Connection connection = Database.getConnection();
             CallableStatement statement = connection.prepareCall(sql)
         ) {
-            setNullableDate(statement, 1, dateFrom);
-            setNullableDate(statement, 2, dateTo);
+            statement.setString(1, search);
+            statement.setInt(2, idPaymentMethod);
+            statement.setInt(3, idUser);
+            setNullableDate(statement, 4, dateFrom);
+            setNullableDate(statement, 5, dateTo);
 
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
@@ -320,9 +321,10 @@ public class SaleDAO {
         Sale sale = new Sale();
         sale.setIdSale(rs.getInt("id_sale"));
         sale.setVoucherCode(rs.getString("voucher_code"));
-        sale.setCustomerName(rs.getString("customer_name"));
         sale.setDocumentKind(rs.getString("document_kind"));
         sale.setDocumentLabel(rs.getString("document_label"));
+        sale.setIdClient(getNullableInt(rs, "id_client"));
+        sale.setCustomerName(rs.getString("customer_name"));
 
         Timestamp saleDate = rs.getTimestamp("sale_date");
         if (saleDate != null) {
@@ -361,12 +363,9 @@ public class SaleDAO {
         sale.setVoucherNumber(rs.getInt("voucher_number"));
         sale.setVoucherCode(rs.getString("voucher_code"));
 
-        // ESTE ERA EL CAMPO QUE FALTABA
+        sale.setIdClient(getNullableInt(rs, "id_client"));
         sale.setCustomerName(rs.getString("customer_name"));
-
-        int docTypeId = rs.getInt("customer_document_type_id");
-        sale.setCustomerDocumentTypeId(rs.wasNull() ? null : docTypeId);
-
+        sale.setCustomerDocumentTypeId(getNullableInt(rs, "customer_document_type_id"));
         sale.setCustomerDocumentTypeName(rs.getString("customer_document_type_name"));
         sale.setCustomerDocumentNumber(rs.getString("customer_document_number"));
 
@@ -379,5 +378,10 @@ public class SaleDAO {
         sale.setStatus(rs.getInt("status"));
 
         return sale;
+    }
+
+    private Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 }

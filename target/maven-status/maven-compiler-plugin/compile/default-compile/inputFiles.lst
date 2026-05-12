@@ -1,4 +1,5 @@
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\App\Main.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\CompanyConfig.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\Database.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\DecolectaConfig.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\PasswordUtil.java
@@ -35,6 +36,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Model
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Client.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DocumentType.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Employee.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\InventoryMetrics.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\InventoryProduct.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\LocationItem.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\PaymentMethod.java
@@ -52,6 +54,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Model
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Supplier.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\User.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Services\DecolectaService.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Services\VoucherPrintService.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\BrandJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\CatalogJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\CategoryJPanel.java
@@ -64,9 +67,11 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\LoginJFrame.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\PaymentMethodJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\ProductJPanel.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\ProfileJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\RegisterJFrame.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\RoleJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SaleHistoryJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SaleJPanel.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SectionRefreshable.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\StockMovementJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SupplierJPanel.java

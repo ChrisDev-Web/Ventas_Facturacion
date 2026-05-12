@@ -78,6 +78,58 @@ public class ClientDAO {
         return null;
     }
 
+    public Client findActiveByDocument(Integer idDocumentType, String documentNumber) throws SQLException {
+        String sql = """
+                SELECT
+                    c.id_client,
+                    c.name,
+                    c.last_name_paternal,
+                    c.last_name_maternal,
+                    c.id_document_type,
+                    dt.name AS document_type_name,
+                    c.document_number,
+                    c.phone,
+                    c.email,
+                    c.address,
+                    c.id_regions,
+                    r.name AS region_name,
+                    c.id_provinces,
+                    p.name AS province_name,
+                    c.id_district,
+                    d.name AS district_name,
+                    c.status,
+                    c.created_at,
+                    c.updated_at,
+                    c.deleted_at
+                FROM clients c
+                LEFT JOIN document_types dt ON dt.id_document_type = c.id_document_type
+                LEFT JOIN regions r ON r.id_region = c.id_regions
+                LEFT JOIN provinces p ON p.id_province = c.id_provinces
+                LEFT JOIN districts d ON d.id_district = c.id_district
+                WHERE c.status = 1
+                  AND c.deleted_at IS NULL
+                  AND c.id_document_type = ?
+                  AND c.document_number = ?
+                LIMIT 1
+                """;
+
+        try (
+            Connection connection = Database.getConnection();
+            java.sql.PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setInt(1, idDocumentType == null ? 0 : idDocumentType);
+            statement.setString(2, documentNumber);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return mapClient(resultSet);
+                }
+            }
+        }
+
+        return null;
+    }
+
     public List<Client> listActive(String search, int page, int limit) throws SQLException {
         String sql = "{CALL sp_client_list_active(?, ?, ?)}";
         List<Client> list = new ArrayList<>();

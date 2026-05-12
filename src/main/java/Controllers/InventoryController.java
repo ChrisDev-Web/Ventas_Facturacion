@@ -1,6 +1,7 @@
 package Controllers;
 
 import DAO.InventoryDAO;
+import Models.InventoryMetrics;
 import Models.InventoryProduct;
 import java.sql.SQLException;
 import java.util.List;
@@ -51,6 +52,14 @@ public class InventoryController {
 
             return product;
 
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
+    public InventoryMetrics getMetrics() throws Exception {
+        try {
+            return inventoryDAO.getMetrics();
         } catch (SQLException e) {
             throw new Exception(getSqlMessage(e));
         }

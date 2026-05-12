@@ -1,10 +1,12 @@
 package Views;
 
 import Controllers.SaleController;
+import Models.Client;
 import Models.Sale;
 import Models.SaleDetail;
 import Models.SaleProductItem;
 import Models.SelectOption;
+import Services.VoucherPrintService;
 import com.github.lgooddatepicker.zinternaltools.WrapLayout;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -33,9 +35,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 
-public class SaleJPanel extends JPanel {
+public class SaleJPanel extends JPanel implements SectionRefreshable {
 
     private final SaleController controller;
+    private final VoucherPrintService voucherPrintService;
     private final int idUser;
     private final String userName;
 
@@ -52,6 +55,7 @@ public class SaleJPanel extends JPanel {
     private JComboBox<SelectOption> cmbCustomerDocumentType;
     private JTextField txtCustomerDocumentNumber;
     private JTextField txtPaidAmount;
+    private Integer selectedClientId;
 
     private JLabel lblSubtotal;
     private JLabel lblIgv;
@@ -74,6 +78,7 @@ public class SaleJPanel extends JPanel {
         this.idUser = idUser;
         this.userName = userName;
         this.controller = new SaleController();
+        this.voucherPrintService = new VoucherPrintService();
         initUI();
         loadCombos();
         loadProducts();
@@ -196,6 +201,27 @@ public class SaleJPanel extends JPanel {
         cmbPaymentMethod.addActionListener(e -> updatePaymentControls());
 
         cmbDocumentKind.addActionListener(e -> updateDocumentControls());
+        cmbCustomerDocumentType.addActionListener(e -> {
+            syncDocumentKindWithCustomerDocumentType();
+            resolveCustomerPreview();
+        });
+
+        txtCustomerDocumentNumber.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                resolveCustomerPreview();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                resolveCustomerPreview();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                resolveCustomerPreview();
+            }
+        });
 
         txtPaidAmount.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             @Override
@@ -219,7 +245,7 @@ public class SaleJPanel extends JPanel {
         controls.add(cmbPaymentMethod);
         controls.add(cmbDocumentKind);
 
-        controls.add(createLabel("Cliente"));
+        controls.add(createLabel("Cliente encontrado"));
         controls.add(createLabel("Tipo doc cliente"));
         controls.add(txtCustomerName);
         controls.add(cmbCustomerDocumentType);
@@ -305,6 +331,9 @@ public class SaleJPanel extends JPanel {
             loadCombo(cmbPaymentMethod, controller.listPaymentMethodOptions(), "Seleccione");
             loadCombo(cmbCustomerDocumentType, controller.listDocumentTypeOptions(), "Sin documento");
 
+            txtCustomerName.setEditable(false);
+            txtCustomerName.setEnabled(false);
+
             updatePaymentControls();
             updateDocumentControls();
 
@@ -325,6 +354,23 @@ public class SaleJPanel extends JPanel {
     private int selectedId(JComboBox<SelectOption> combo) {
         SelectOption option = (SelectOption) combo.getSelectedItem();
         return option == null ? 0 : option.getId();
+    }
+
+    private void selectComboItemById(JComboBox<SelectOption> combo, int id) {
+        if (combo.getItemCount() == 0) {
+            return;
+        }
+
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            SelectOption option = combo.getItemAt(i);
+
+            if (option != null && option.getId() == id) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+
+        combo.setSelectedIndex(0);
     }
 
     private void loadProducts() {
@@ -611,6 +657,38 @@ public class SaleJPanel extends JPanel {
         return documentKind.trim().equalsIgnoreCase("TICKET");
     }
 
+    private String selectedCustomerDocumentTypeName() {
+        SelectOption option = (SelectOption) cmbCustomerDocumentType.getSelectedItem();
+
+        if (option == null || option.getName() == null) {
+            return "";
+        }
+
+        return option.getName().trim().toUpperCase();
+    }
+
+    private String resolveDocumentKindForSale() {
+        if (isTicketSelected()) {
+            return "TICKET";
+        }
+
+        String documentTypeName = selectedCustomerDocumentTypeName();
+        return documentTypeName.contains("RUC") ? "FACTURA" : "BOLETA";
+    }
+
+    private void syncDocumentKindWithCustomerDocumentType() {
+        if (isTicketSelected()) {
+            return;
+        }
+
+        String expectedDocumentKind = resolveDocumentKindForSale();
+        Object currentSelection = cmbDocumentKind.getSelectedItem();
+
+        if (currentSelection == null || !expectedDocumentKind.equalsIgnoreCase(currentSelection.toString())) {
+            cmbDocumentKind.setSelectedItem(expectedDocumentKind);
+        }
+    }
+
     private void updatePaymentControls() {
         boolean isCash = isCashPaymentSelected();
 
@@ -628,7 +706,7 @@ public class SaleJPanel extends JPanel {
         boolean isTicket = isTicketSelected();
 
         txtCustomerName.setEnabled(!isTicket);
-        txtCustomerName.setEditable(!isTicket);
+        txtCustomerName.setEditable(false);
 
         cmbCustomerDocumentType.setEnabled(!isTicket);
 
@@ -636,9 +714,80 @@ public class SaleJPanel extends JPanel {
         txtCustomerDocumentNumber.setEditable(!isTicket);
 
         if (isTicket) {
+            selectedClientId = null;
             txtCustomerName.setText("");
             cmbCustomerDocumentType.setSelectedIndex(0);
             txtCustomerDocumentNumber.setText("");
+        } else {
+            syncDocumentKindWithCustomerDocumentType();
+            resolveCustomerPreview();
+        }
+    }
+
+    @Override
+    public void refreshSectionData() {
+        String currentSearch = txtSearch.getText();
+        int currentCategoryId = selectedId(cmbCategory);
+        int currentBrandId = selectedId(cmbBrand);
+        int currentPaymentMethodId = selectedId(cmbPaymentMethod);
+        int currentCustomerDocumentTypeId = selectedId(cmbCustomerDocumentType);
+        String currentDocumentKind = (String) cmbDocumentKind.getSelectedItem();
+        String currentCustomerDocumentNumber = txtCustomerDocumentNumber.getText();
+        String currentPaidAmount = txtPaidAmount.getText();
+
+        loadCombos();
+
+        selectComboItemById(cmbCategory, currentCategoryId);
+        selectComboItemById(cmbBrand, currentBrandId);
+        selectComboItemById(cmbPaymentMethod, currentPaymentMethodId);
+        selectComboItemById(cmbCustomerDocumentType, currentCustomerDocumentTypeId);
+
+        if (currentDocumentKind != null) {
+            cmbDocumentKind.setSelectedItem(currentDocumentKind);
+        }
+
+        txtSearch.setText(currentSearch == null ? "" : currentSearch);
+        txtCustomerDocumentNumber.setText(currentCustomerDocumentNumber == null ? "" : currentCustomerDocumentNumber);
+        txtPaidAmount.setText(currentPaidAmount == null ? "" : currentPaidAmount);
+
+        updatePaymentControls();
+        updateDocumentControls();
+        loadProducts();
+    }
+
+    private void resolveCustomerPreview() {
+        if (isTicketSelected()) {
+            selectedClientId = null;
+            txtCustomerName.setText("");
+            return;
+        }
+
+        int documentTypeId = selectedId(cmbCustomerDocumentType);
+        String documentNumber = txtCustomerDocumentNumber.getText() == null
+                ? ""
+                : txtCustomerDocumentNumber.getText().trim();
+
+        if (documentTypeId <= 0 || documentNumber.isEmpty()) {
+            selectedClientId = null;
+            txtCustomerName.setText("");
+            return;
+        }
+
+        try {
+            Client client = controller.findActiveClientByDocument(documentTypeId, documentNumber);
+
+            if (client == null) {
+                selectedClientId = null;
+                txtCustomerName.setText(documentNumber.length() >= 8 ? "Cliente no encontrado" : "");
+                return;
+            }
+
+            selectedClientId = client.getIdClient();
+            txtCustomerName.setText(client.getFullName().trim());
+
+        } catch (Exception e) {
+            selectedClientId = null;
+            txtCustomerName.setText("");
         }
     }
 
@@ -679,17 +828,13 @@ public class SaleJPanel extends JPanel {
                 paidAmount = total;
             }
 
-            String documentKind = (String) cmbDocumentKind.getSelectedItem();
+            String documentKind = resolveDocumentKindForSale();
+            cmbDocumentKind.setSelectedItem(documentKind);
 
-            String customerName = null;
             Integer customerDocumentTypeId = null;
             String customerDocumentNumber = null;
 
             if (!isTicketSelected()) {
-                if (txtCustomerName.getText() == null || txtCustomerName.getText().trim().isEmpty()) {
-                    throw new Exception("Ingrese el nombre del cliente.");
-                }
-
                 int selectedDocumentTypeId = selectedId(cmbCustomerDocumentType);
 
                 if (selectedDocumentTypeId <= 0) {
@@ -700,7 +845,12 @@ public class SaleJPanel extends JPanel {
                     throw new Exception("Ingrese el número de documento del cliente.");
                 }
 
-                customerName = txtCustomerName.getText().trim();
+                resolveCustomerPreview();
+
+                if (selectedClientId == null) {
+                    throw new Exception("No se encontró un cliente registrado con ese documento.");
+                }
+
                 customerDocumentTypeId = selectedDocumentTypeId;
                 customerDocumentNumber = txtCustomerDocumentNumber.getText().trim();
             }
@@ -709,7 +859,7 @@ public class SaleJPanel extends JPanel {
             sale.setIdUser(idUser);
             sale.setIdPaymentMethod(idPaymentMethod);
             sale.setDocumentKind(documentKind);
-            sale.setCustomerName(customerName);
+            sale.setIdClient(selectedClientId);
             sale.setCustomerDocumentTypeId(customerDocumentTypeId);
             sale.setCustomerDocumentNumber(customerDocumentNumber);
             sale.setPaidAmount(paidAmount);
@@ -729,17 +879,27 @@ public class SaleJPanel extends JPanel {
             sale.setDetails(details);
 
             Sale result = controller.createSale(sale);
+            String printMessage = "\nImpresion enviada a PDF24.";
+
+            try {
+                Sale printedSale = controller.findById(result.getIdSale());
+                voucherPrintService.printSale(printedSale);
+            } catch (Exception printException) {
+                printMessage = "\nVenta registrada, pero no se pudo imprimir en PDF24: " + printException.getMessage();
+            }
 
             JOptionPane.showMessageDialog(
                     this,
                     "Venta registrada correctamente.\nComprobante: " + result.getVoucherCode()
                     + "\nTotal: S/ " + money(result.getTotal())
-                    + "\nVuelto: S/ " + money(result.getChangeAmount()),
+                    + "\nVuelto: S/ " + money(result.getChangeAmount())
+                    + printMessage,
                     "Venta registrada",
                     JOptionPane.INFORMATION_MESSAGE
             );
 
             cart.clear();
+            selectedClientId = null;
             txtPaidAmount.setText("");
             txtCustomerName.setText("");
             txtCustomerDocumentNumber.setText("");

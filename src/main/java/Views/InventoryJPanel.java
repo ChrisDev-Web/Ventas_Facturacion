@@ -2,6 +2,7 @@ package Views;
 
 import Controllers.InventoryController;
 import Controllers.StockMovementController;
+import Models.InventoryMetrics;
 import Models.InventoryProduct;
 import Models.StockMovement;
 import java.awt.BorderLayout;
@@ -10,6 +11,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridLayout;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -37,7 +39,7 @@ import javax.swing.table.TableCellRenderer;
 import jiconfont.icons.font_awesome.FontAwesome;
 import jiconfont.swing.IconFontSwing;
 
-public class InventoryJPanel extends JPanel {
+public class InventoryJPanel extends JPanel implements SectionRefreshable {
 
     private final InventoryController controller;
     private final StockMovementController movementController;
@@ -46,6 +48,10 @@ public class InventoryJPanel extends JPanel {
     private JComboBox<String> cmbStockFilter;
     private JComboBox<Integer> cmbLimit;
     private JLabel lblPagination;
+    private JLabel lblInventoryCost;
+    private JLabel lblInventorySale;
+    private JLabel lblUnits;
+    private JLabel lblStockAlerts;
 
     private JTable table;
     private DefaultTableModel tableModel;
@@ -104,6 +110,19 @@ public class InventoryJPanel extends JPanel {
 
         titlePanel.add(lblTitle, BorderLayout.NORTH);
         titlePanel.add(lblSubtitle, BorderLayout.SOUTH);
+
+        JPanel statsPanel = new JPanel(new GridLayout(1, 4, 12, 12));
+        statsPanel.setBackground(backgroundColor);
+
+        lblInventoryCost = createMetricValueLabel();
+        lblInventorySale = createMetricValueLabel();
+        lblUnits = createMetricValueLabel();
+        lblStockAlerts = createMetricValueLabel();
+
+        statsPanel.add(createMetricCard("Valor costo", lblInventoryCost, primaryColor));
+        statsPanel.add(createMetricCard("Valor venta", lblInventorySale, successColor));
+        statsPanel.add(createMetricCard("Unidades", lblUnits, warningColor));
+        statsPanel.add(createMetricCard("Alertas stock", lblStockAlerts, dangerColor));
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         toolbar.setBackground(backgroundColor);
@@ -166,9 +185,40 @@ public class InventoryJPanel extends JPanel {
         toolbar.add(cmbLimit);
 
         container.add(titlePanel, BorderLayout.NORTH);
+        container.add(statsPanel, BorderLayout.CENTER);
         container.add(toolbar, BorderLayout.SOUTH);
 
         return container;
+    }
+
+    private JLabel createMetricValueLabel() {
+        JLabel label = new JLabel("-");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        label.setForeground(textColor);
+        return label;
+    }
+
+    private JPanel createMetricCard(String title, JLabel valueLabel, Color accentColor) {
+        JPanel card = new JPanel(new BorderLayout(0, 8));
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+
+        JLabel lblTitle = new JLabel(title);
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lblTitle.setForeground(new Color(95, 95, 95));
+
+        JPanel accent = new JPanel();
+        accent.setBackground(accentColor);
+        accent.setPreferredSize(new Dimension(100, 4));
+
+        card.add(lblTitle, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+        card.add(accent, BorderLayout.SOUTH);
+
+        return card;
     }
 
     private JPanel createTablePanel() {
@@ -245,6 +295,7 @@ public class InventoryJPanel extends JPanel {
 
     private void loadTable() {
         try {
+            loadMetrics();
             tableModel.setRowCount(0);
 
             int totalRecords = controller.count(currentSearch, currentStockFilter);
@@ -272,6 +323,15 @@ public class InventoryJPanel extends JPanel {
         } catch (Exception e) {
             showError(e.getMessage());
         }
+    }
+
+    private void loadMetrics() throws Exception {
+        InventoryMetrics metrics = controller.getMetrics();
+
+        lblInventoryCost.setText("S/ " + money(metrics.getTotalCostValue()));
+        lblInventorySale.setText("S/ " + money(metrics.getTotalSaleValue()));
+        lblUnits.setText(metrics.getTotalUnits() + " und. / " + metrics.getActiveProducts() + " prod.");
+        lblStockAlerts.setText(metrics.getOutOfStockProducts() + " agot. / " + metrics.getLowStockProducts() + " bajos");
     }
 
     private void openDetail(int idProduct) {
@@ -401,6 +461,11 @@ public class InventoryJPanel extends JPanel {
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    @Override
+    public void refreshSectionData() {
+        loadTable();
     }
 
     private class ActionsRenderer extends JPanel implements TableCellRenderer {

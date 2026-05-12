@@ -1,6 +1,8 @@
 package Controllers;
 
+import DAO.ClientDAO;
 import DAO.SaleDAO;
+import Models.Client;
 import Models.Sale;
 import Models.SaleDetail;
 import Models.SaleHistoryStats;
@@ -15,9 +17,11 @@ import java.util.List;
 public class SaleController {
 
     private final SaleDAO saleDAO;
+    private final ClientDAO clientDAO;
 
     public SaleController() {
         this.saleDAO = new SaleDAO();
+        this.clientDAO = new ClientDAO();
     }
 
     public List<SaleProductItem> listProducts(String search, int idCategory, int idBrand) throws Exception {
@@ -30,9 +34,28 @@ public class SaleController {
 
     public Sale createSale(Sale sale) throws Exception {
         validateSale(sale);
+        resolveCustomerForSale(sale);
 
         try {
             return saleDAO.createSale(sale);
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
+    public Client findActiveClientByDocument(Integer idDocumentType, String documentNumber) throws Exception {
+        if (idDocumentType == null || idDocumentType <= 0) {
+            return null;
+        }
+
+        String normalizedDocument = normalizeDocument(documentNumber);
+
+        if (normalizedDocument == null) {
+            return null;
+        }
+
+        try {
+            return clientDAO.findActiveByDocument(idDocumentType, normalizedDocument);
         } catch (SQLException e) {
             throw new Exception(getSqlMessage(e));
         }
@@ -102,9 +125,9 @@ public class SaleController {
         }
     }
 
-    public List<SaleRanking> getRanking(LocalDate dateFrom, LocalDate dateTo) throws Exception {
+    public List<SaleRanking> getRanking(String search, int idPaymentMethod, int idUser, LocalDate dateFrom, LocalDate dateTo) throws Exception {
         try {
-            return saleDAO.getRanking(dateFrom, dateTo);
+            return saleDAO.getRanking(normalizeSearch(search), idPaymentMethod, idUser, dateFrom, dateTo);
         } catch (SQLException e) {
             throw new Exception(getSqlMessage(e));
         }
@@ -112,13 +135,13 @@ public class SaleController {
 
     public Sale findById(int idSale) throws Exception {
         if (idSale <= 0) {
-            throw new Exception("Seleccione una venta válida.");
+            throw new Exception("Seleccione una venta valida.");
         }
 
         try {
             Sale sale = saleDAO.findById(idSale);
             if (sale == null) {
-                throw new Exception("No se encontró la venta.");
+                throw new Exception("No se encontro la venta.");
             }
             return sale;
         } catch (SQLException e) {
@@ -128,11 +151,11 @@ public class SaleController {
 
     private void validateSale(Sale sale) throws Exception {
         if (sale.getIdUser() <= 0) {
-            throw new Exception("Usuario no válido.");
+            throw new Exception("Usuario no valido.");
         }
 
         if (sale.getIdPaymentMethod() <= 0) {
-            throw new Exception("Seleccione un método de pago.");
+            throw new Exception("Seleccione un metodo de pago.");
         }
 
         if (sale.getDetails() == null || sale.getDetails().isEmpty()) {
@@ -140,12 +163,22 @@ public class SaleController {
         }
 
         if (sale.getPaidAmount() == null || sale.getPaidAmount().compareTo(BigDecimal.ZERO) < 0) {
-            throw new Exception("Ingrese un monto pagado válido.");
+            throw new Exception("Ingrese un monto pagado valido.");
+        }
+
+        if (!isTicket(sale.getDocumentKind())) {
+            if (sale.getCustomerDocumentTypeId() == null || sale.getCustomerDocumentTypeId() <= 0) {
+                throw new Exception("Seleccione el tipo de documento del cliente.");
+            }
+
+            if (normalizeDocument(sale.getCustomerDocumentNumber()) == null) {
+                throw new Exception("Ingrese el numero de documento del cliente.");
+            }
         }
 
         for (SaleDetail detail : sale.getDetails()) {
             if (detail.getIdProduct() <= 0) {
-                throw new Exception("El carrito tiene productos inválidos.");
+                throw new Exception("El carrito tiene productos invalidos.");
             }
 
             if (detail.getQuantity() <= 0) {
@@ -160,6 +193,39 @@ public class SaleController {
                 detail.setDiscountValue(BigDecimal.ZERO);
             }
         }
+    }
+
+    private void resolveCustomerForSale(Sale sale) throws Exception {
+        if (isTicket(sale.getDocumentKind())) {
+            sale.setIdClient(null);
+            sale.setCustomerName(null);
+            sale.setCustomerDocumentTypeId(null);
+            sale.setCustomerDocumentNumber(null);
+            return;
+        }
+
+        Client client = findActiveClientByDocument(sale.getCustomerDocumentTypeId(), sale.getCustomerDocumentNumber());
+
+        if (client == null) {
+            throw new Exception("No existe un cliente activo registrado con ese tipo y numero de documento.");
+        }
+
+        sale.setIdClient(client.getIdClient());
+        sale.setCustomerName(client.getFullName().trim());
+        sale.setCustomerDocumentNumber(normalizeDocument(client.getDocumentNumber()));
+        sale.setCustomerDocumentTypeId(client.getIdDocumentType());
+    }
+
+    private boolean isTicket(String documentKind) {
+        return documentKind == null || documentKind.trim().equalsIgnoreCase("TICKET");
+    }
+
+    private String normalizeDocument(String documentNumber) {
+        if (documentNumber == null || documentNumber.trim().isEmpty()) {
+            return null;
+        }
+
+        return documentNumber.trim();
     }
 
     private String normalizeSearch(String search) {
@@ -184,6 +250,6 @@ public class SaleController {
         if (e.getMessage() != null && !e.getMessage().isBlank()) {
             return e.getMessage();
         }
-        return "Ocurrió un error al comunicarse con la base de datos.";
+        return "Ocurrio un error al comunicarse con la base de datos.";
     }
 }

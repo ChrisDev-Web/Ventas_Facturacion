@@ -6,6 +6,10 @@ public class User {
 
     private int idUser;
     private String userName;
+    private String fullName;
+    private String email;
+    private String phone;
+    private String profileImagePath;
     private String password;
     private int status;
     private LocalDateTime createdAt;
@@ -45,6 +49,38 @@ public class User {
         this.userName = userName;
     }
 
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getProfileImagePath() {
+        return profileImagePath;
+    }
+
+    public void setProfileImagePath(String profileImagePath) {
+        this.profileImagePath = profileImagePath;
+    }
+
     public String getPassword() {
         return password;
     }
@@ -82,6 +118,18 @@ public class User {
 
     public boolean isActive() {
         return status == 1;
+    }
+
+    public String getDisplayName() {
+        if (fullName != null && !fullName.trim().isEmpty()) {
+            return fullName.trim();
+        }
+
+        if (userName != null && !userName.trim().isEmpty()) {
+            return userName.trim();
+        }
+
+        return "Usuario";
     }
 
     @Override

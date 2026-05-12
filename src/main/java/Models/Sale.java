@@ -19,7 +19,8 @@ public class Sale {
     private String voucherSeries;
     private int voucherNumber;
     private String voucherCode;
-    
+
+    private Integer idClient;
     private String customerName;
     private Integer customerDocumentTypeId;
     private String customerDocumentTypeName;
@@ -133,6 +134,14 @@ public class Sale {
 
     public void setVoucherCode(String voucherCode) {
         this.voucherCode = voucherCode;
+    }
+
+    public Integer getIdClient() {
+        return idClient;
+    }
+
+    public void setIdClient(Integer idClient) {
+        this.idClient = idClient;
     }
 
     public Integer getCustomerDocumentTypeId() {

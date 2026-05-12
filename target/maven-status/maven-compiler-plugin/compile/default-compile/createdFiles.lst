@@ -1,4 +1,5 @@
 Views\LocationJPanel$CrudBoxPanel.class
+Views\ProfileJPanel.class
 Controllers\RoleController.class
 Controllers\ProductController.class
 Views\ClientJPanel$InactiveActionsRenderer.class
@@ -75,9 +76,11 @@ Views\CatalogJPanel.class
 Views\EmployeeJPanel.class
 Controllers\SaleController.class
 Views\ProductJPanel$2.class
+Services\VoucherPrintService$VoucherPrintable.class
 Views\DocumentTypeJPanel$ActiveActionsRenderer.class
 Views\RoleJPanel$ActiveActionsRenderer.class
 Views\BrandJPanel$ActiveActionsEditor.class
+Config\CompanyConfig.class
 Controllers\LocationController.class
 Views\DashboardJFrame.class
 Views\StockMovementJPanel.class
@@ -91,12 +94,14 @@ Views\ProductJPanel$ActiveActionsEditor.class
 Views\RoleJPanel$1.class
 Views\InventoryJPanel$1.class
 Views\PaymentMethodJPanel$2.class
+Views\SaleHistoryJPanel$2.class
 Views\InventoryJPanel$ActionsEditor.class
 Controllers\CategoryController.class
 Views\SaleHistoryJPanel.class
 Views\RegisterJFrame$PlaceholderPasswordField.class
 Views\CategoryJPanel$ActiveActionsRenderer.class
 Views\ClientJPanel.class
+Views\ProfileJPanel$AvatarPreviewPanel.class
 Config\DecolectaConfig.class
 Views\BrandJPanel.class
 Views\CategoryJPanel$InactiveActionsRenderer.class
@@ -130,6 +135,7 @@ Models\Client.class
 Views\DashboardJFrame$SideMenuItem$1.class
 Models\SaleRanking.class
 Views\DashboardJFrame$SideMenuItem.class
+Views\SaleJPanel$2.class
 Views\SaleJPanel$CartItem.class
 Controllers\PaymentMethodController.class
 Views\EmployeeJPanel$ActiveActionsRenderer.class
@@ -141,9 +147,11 @@ DAO\SaleDAO.class
 Views\BrandJPanel$2.class
 DAO\UserDAO.class
 Views\PaymentMethodJPanel$InactiveActionsRenderer.class
+Models\InventoryMetrics.class
 Views\SaleJPanel$WrapLayout.class
 Views\SaleHistoryJPanel$ActionsEditor.class
 Views\DashboardJFrame$CircularAvatar.class
+Services\VoucherPrintService.class
 Views\DashboardJFrame$LogoLabel.class
 Views\LocationJPanel$CrudBoxPanel$2.class
 Models\LocationItem.class
@@ -155,5 +163,6 @@ Models\Employee.class
 Views\SaleHistoryJPanel$1.class
 Controllers\StockMovementController.class
 Models\ReniecPerson.class
+Views\SectionRefreshable.class
 Models\Supplier.class
 Models\SaleProductItem.class

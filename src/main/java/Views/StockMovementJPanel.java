@@ -3,6 +3,8 @@ package Views;
 import Controllers.StockMovementController;
 import Models.SelectOption;
 import Models.StockMovement;
+import com.github.lgooddatepicker.components.DatePicker;
+import com.github.lgooddatepicker.components.DatePickerSettings;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -16,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -38,13 +41,13 @@ import javax.swing.table.TableCellRenderer;
 import jiconfont.icons.font_awesome.FontAwesome;
 import jiconfont.swing.IconFontSwing;
 
-public class StockMovementJPanel extends JPanel {
+public class StockMovementJPanel extends JPanel implements SectionRefreshable {
 
     private final StockMovementController controller;
 
     private JTextField txtSearch;
-    private JTextField txtDateFrom;
-    private JTextField txtDateTo;
+    private DatePicker dpDateFrom;
+    private DatePicker dpDateTo;
     private JComboBox<SelectOption> cmbProduct;
     private JComboBox<String> cmbMovementType;
     private JComboBox<Integer> cmbLimit;
@@ -121,13 +124,8 @@ public class StockMovementJPanel extends JPanel {
         cmbMovementType.setPreferredSize(new Dimension(120, 36));
         cmbMovementType.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-        txtDateFrom = new JTextField();
-        txtDateFrom.setPreferredSize(new Dimension(120, 36));
-        txtDateFrom.setToolTipText("Desde yyyy-MM-dd");
-
-        txtDateTo = new JTextField();
-        txtDateTo.setPreferredSize(new Dimension(120, 36));
-        txtDateTo.setToolTipText("Hasta yyyy-MM-dd");
+        dpDateFrom = createDatePicker();
+        dpDateTo = createDatePicker();
 
         cmbLimit = new JComboBox<>(new Integer[]{10, 20, 50});
         cmbLimit.setPreferredSize(new Dimension(80, 36));
@@ -146,8 +144,8 @@ public class StockMovementJPanel extends JPanel {
             txtSearch.setText("");
             cmbProduct.setSelectedIndex(0);
             cmbMovementType.setSelectedIndex(0);
-            txtDateFrom.setText("");
-            txtDateTo.setText("");
+            dpDateFrom.setDate(null);
+            dpDateTo.setDate(null);
             currentPage = 1;
             loadTable();
         });
@@ -163,8 +161,8 @@ public class StockMovementJPanel extends JPanel {
         toolbar.add(txtSearch);
         toolbar.add(cmbProduct);
         toolbar.add(cmbMovementType);
-        toolbar.add(txtDateFrom);
-        toolbar.add(txtDateTo);
+        toolbar.add(dpDateFrom);
+        toolbar.add(dpDateTo);
         toolbar.add(btnSearch);
         toolbar.add(btnClear);
         toolbar.add(btnNew);
@@ -175,6 +173,16 @@ public class StockMovementJPanel extends JPanel {
         container.add(toolbar, BorderLayout.SOUTH);
 
         return container;
+    }
+
+    private DatePicker createDatePicker() {
+        DatePickerSettings settings = new DatePickerSettings(new Locale("es", "PE"));
+        settings.setFormatForDatesCommonEra("dd/MM/yyyy");
+        settings.setAllowKeyboardEditing(false);
+
+        DatePicker datePicker = new DatePicker(settings);
+        datePicker.setPreferredSize(new Dimension(130, 36));
+        return datePicker;
     }
 
     private JPanel createTablePanel() {
@@ -264,6 +272,36 @@ public class StockMovementJPanel extends JPanel {
         }
     }
 
+    private void selectComboItemById(JComboBox<SelectOption> combo, int id) {
+        if (combo.getItemCount() == 0) {
+            return;
+        }
+
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            SelectOption option = combo.getItemAt(i);
+
+            if (option != null && option.getId() == id) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+
+        combo.setSelectedIndex(0);
+    }
+
+    @Override
+    public void refreshSectionData() {
+        int currentProductId = selectedId(cmbProduct);
+        LocalDate currentDateFrom = dpDateFrom.getDate();
+        LocalDate currentDateTo = dpDateTo.getDate();
+
+        loadCombos();
+        selectComboItemById(cmbProduct, currentProductId);
+        dpDateFrom.setDate(currentDateFrom);
+        dpDateTo.setDate(currentDateTo);
+        loadTable();
+    }
+
     private void loadTable() {
         try {
             tableModel.setRowCount(0);
@@ -271,8 +309,8 @@ public class StockMovementJPanel extends JPanel {
             String search = txtSearch.getText().trim();
             int idProduct = selectedId(cmbProduct);
             String movementType = (String) cmbMovementType.getSelectedItem();
-            LocalDate dateFrom = parseDate(txtDateFrom.getText());
-            LocalDate dateTo = parseDate(txtDateTo.getText());
+            LocalDate dateFrom = dpDateFrom.getDate();
+            LocalDate dateTo = dpDateTo.getDate();
 
             int totalRecords = controller.count(search, idProduct, movementType, dateFrom, dateTo);
             totalPages = Math.max(1, (int) Math.ceil((double) totalRecords / limit));
