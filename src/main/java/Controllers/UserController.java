@@ -6,6 +6,7 @@ import Models.User;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 
 public class UserController {
 
@@ -33,6 +34,107 @@ public class UserController {
         } finally {
             clearPassword(password);
             clearPassword(confirmPassword);
+        }
+    }
+
+    public void createUser(User user, char[] password, char[] confirmPassword) throws Exception {
+        validateUserForm(user, true);
+        validatePasswordPair(password, confirmPassword, true);
+
+        try {
+            user.setUserName(user.getUserName().trim());
+            user.setFullName(normalizeText(user.getFullName()));
+            user.setEmail(normalizeText(user.getEmail()));
+            user.setPhone(normalizeText(user.getPhone()));
+            user.setProfileImagePath(normalizeText(user.getProfileImagePath()));
+            user.setPassword(PasswordUtil.hashPassword(password));
+            user.setStatus(normalizeStatus(user.getStatus()));
+
+            userDAO.create(user);
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        } finally {
+            clearPassword(password);
+            clearPassword(confirmPassword);
+        }
+    }
+
+    public void updateUser(User user, char[] password, char[] confirmPassword) throws Exception {
+        validateUserForm(user, false);
+
+        boolean changePassword = (password != null && password.length > 0)
+                || (confirmPassword != null && confirmPassword.length > 0);
+
+        if (changePassword) {
+            validatePasswordPair(password, confirmPassword, false);
+        }
+
+        try {
+            user.setUserName(user.getUserName().trim());
+            user.setFullName(normalizeText(user.getFullName()));
+            user.setEmail(normalizeText(user.getEmail()));
+            user.setPhone(normalizeText(user.getPhone()));
+            user.setProfileImagePath(normalizeText(user.getProfileImagePath()));
+            user.setStatus(normalizeStatus(user.getStatus()));
+
+            if (changePassword) {
+                user.setPassword(PasswordUtil.hashPassword(password));
+            } else {
+                user.setPassword(null);
+            }
+
+            userDAO.update(user);
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        } finally {
+            clearPassword(password);
+            clearPassword(confirmPassword);
+        }
+    }
+
+    public List<User> listUsers(String search, int page, int limit) throws Exception {
+        try {
+            return userDAO.list(normalizeSearch(search), normalizePage(page), normalizeLimit(limit));
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
+    public int countUsers(String search) throws Exception {
+        try {
+            return userDAO.count(normalizeSearch(search));
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
+    public User findUserById(int idUser) throws Exception {
+        if (idUser <= 0) {
+            throw new Exception("Usuario no valido.");
+        }
+
+        try {
+            User user = userDAO.findManagementById(idUser);
+
+            if (user == null) {
+                throw new Exception("No se encontro el usuario.");
+            }
+
+            return user;
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
+    public void deleteUserPhysical(int idUser) throws Exception {
+        if (idUser <= 0) {
+            throw new Exception("Usuario no valido.");
+        }
+
+        try {
+            userDAO.deletePhysical(idUser);
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
         }
     }
 
@@ -157,6 +259,39 @@ public class UserController {
         }
     }
 
+    private void validateUserForm(User user, boolean creating) throws Exception {
+        if (user == null) {
+            throw new Exception("Complete los datos del usuario.");
+        }
+
+        if (!creating && user.getIdUser() <= 0) {
+            throw new Exception("Usuario no valido.");
+        }
+
+        validateUserName(user.getUserName());
+
+        if (user.getFullName() != null && user.getFullName().trim().length() > 150) {
+            throw new Exception("El nombre completo no puede exceder 150 caracteres.");
+        }
+
+        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()
+                && !user.getEmail().trim().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw new Exception("Ingrese un correo valido.");
+        }
+
+        if (user.getPhone() != null && user.getPhone().trim().length() > 20) {
+            throw new Exception("El telefono no puede exceder 20 caracteres.");
+        }
+
+        if (user.getProfileImagePath() != null && user.getProfileImagePath().trim().length() > 500) {
+            throw new Exception("La ruta de la foto no puede exceder 500 caracteres.");
+        }
+
+        if (user.getStatus() != 0 && user.getStatus() != 1) {
+            throw new Exception("Seleccione un estado valido.");
+        }
+    }
+
     private void validateUserName(String userName) throws Exception {
         if (userName == null || userName.trim().isEmpty()) {
             throw new Exception("Ingrese un nombre de usuario.");
@@ -203,6 +338,30 @@ public class UserController {
         }
 
         return value.trim();
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.trim().isEmpty()) {
+            return "";
+        }
+
+        return search.trim();
+    }
+
+    private int normalizePage(int page) {
+        return page < 1 ? 1 : page;
+    }
+
+    private int normalizeLimit(int limit) {
+        if (limit == 20 || limit == 50) {
+            return limit;
+        }
+
+        return 10;
+    }
+
+    private int normalizeStatus(int status) {
+        return status == 0 ? 0 : 1;
     }
 
     private void clearPassword(char[] password) {

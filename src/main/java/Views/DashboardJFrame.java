@@ -58,8 +58,10 @@ public class DashboardJFrame extends JFrame {
     private JLabel lblSidebarUser;
     private JLabel lblSidebarUserName;
     private JLabel lblDashboardWelcome;
+    private DashboardJPanel dashboardPanel;
 
     private SideMenuItem itemDashboard;
+    private SideMenuItem itemAlertas;
     private SideMenuItem itemVentas;
     private SideMenuItem itemHistorialVentas;
     private SideMenuItem itemProductos;
@@ -68,6 +70,7 @@ public class DashboardJFrame extends JFrame {
     private SideMenuItem itemClientes;
     private SideMenuItem itemProveedores;
     private SideMenuItem itemEmpleados;
+    private SideMenuItem itemUsuarios;
     private SideMenuItem itemReportes;
     private SideMenuItem itemConfiguracion;
 
@@ -296,6 +299,7 @@ public class DashboardJFrame extends JFrame {
         menuContainer.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 12));
 
         itemDashboard = createMenuItem(FontAwesome.HOME, "Dashboard", false);
+        itemAlertas = createMenuItem(FontAwesome.BELL, "Alertas", false);
         itemVentas = createMenuItem(FontAwesome.SHOPPING_CART, "Ventas", false);
         itemHistorialVentas = createMenuItem(FontAwesome.LIST_ALT, "Historial Ventas", false);
         itemProductos = createMenuItem(FontAwesome.CUBE, "Productos", false);
@@ -304,10 +308,12 @@ public class DashboardJFrame extends JFrame {
         itemClientes = createMenuItem(FontAwesome.USERS, "Clientes", false);
         itemProveedores = createMenuItem(FontAwesome.TRUCK, "Proveedores", false);
         itemEmpleados = createMenuItem(FontAwesome.USER, "Empleados", false);
+        itemUsuarios = createMenuItem(FontAwesome.USER_CIRCLE, "Usuarios", false);
         itemReportes = createMenuItem(FontAwesome.BAR_CHART, "Reportes", false);
         itemConfiguracion = createMenuItem(FontAwesome.COG, "Configuracion", true);
 
         itemDashboard.addClickAction(() -> showSection("DASHBOARD", itemDashboard));
+        itemAlertas.addClickAction(() -> showSection("ALERTAS", itemAlertas));
         itemVentas.addClickAction(() -> showSection("VENTAS", itemVentas));
         itemHistorialVentas.addClickAction(() -> showSection("HISTORIAL_VENTAS", itemHistorialVentas));
         itemProductos.addClickAction(() -> showSection("PRODUCTOS", itemProductos));
@@ -316,10 +322,13 @@ public class DashboardJFrame extends JFrame {
         itemClientes.addClickAction(() -> showSection("CLIENTES", itemClientes));
         itemProveedores.addClickAction(() -> showSection("PROVEEDORES", itemProveedores));
         itemEmpleados.addClickAction(() -> showSection("EMPLEADOS", itemEmpleados));
+        itemUsuarios.addClickAction(() -> showSection("USUARIOS", itemUsuarios));
         itemReportes.addClickAction(() -> showSection("REPORTES", itemReportes));
         itemConfiguracion.addClickAction(() -> toggleConfigMenu());
 
         menuContainer.add(itemDashboard);
+        menuContainer.add(Box.createVerticalStrut(8));
+        menuContainer.add(itemAlertas);
         menuContainer.add(Box.createVerticalStrut(8));
         menuContainer.add(itemVentas);
         menuContainer.add(Box.createVerticalStrut(8));
@@ -336,6 +345,8 @@ public class DashboardJFrame extends JFrame {
         menuContainer.add(itemProveedores);
         menuContainer.add(Box.createVerticalStrut(8));
         menuContainer.add(itemEmpleados);
+        menuContainer.add(Box.createVerticalStrut(8));
+        menuContainer.add(itemUsuarios);
         menuContainer.add(Box.createVerticalStrut(8));
         menuContainer.add(itemReportes);
         menuContainer.add(Box.createVerticalStrut(8));
@@ -466,7 +477,14 @@ public class DashboardJFrame extends JFrame {
         contentPanel.setBackground(backgroundColor);
         contentPanel.setBorder(BorderFactory.createEmptyBorder(35, 35, 35, 35));
 
-        contentPanel.add(createDashboardPanel(), "DASHBOARD");
+        dashboardPanel = new DashboardJPanel(
+                getSafeDisplayName(),
+                () -> showSection("HISTORIAL_VENTAS", itemHistorialVentas),
+                () -> showSection("ALERTAS", itemAlertas)
+        );
+
+        contentPanel.add(dashboardPanel, "DASHBOARD");
+        contentPanel.add(createAlertasPanel(), "ALERTAS");
         contentPanel.add(new SaleJPanel(getSafeUserId(), getSafeUserName()), "VENTAS");
         contentPanel.add(new SaleHistoryJPanel(), "HISTORIAL_VENTAS");
         contentPanel.add(new ProductJPanel(), "PRODUCTOS");
@@ -475,6 +493,7 @@ public class DashboardJFrame extends JFrame {
         contentPanel.add(new ClientJPanel(), "CLIENTES");
         contentPanel.add(new SupplierJPanel(), "PROVEEDORES");
         contentPanel.add(new EmployeeJPanel(), "EMPLEADOS");
+        contentPanel.add(new UserJPanel(), "USUARIOS");
         contentPanel.add(createSectionPanel("Reportes", "Aqui ira el modulo de reportes."), "REPORTES");
         contentPanel.add(new DocumentTypeJPanel(), "TIPO_DOCUMENTOS");
         contentPanel.add(new RoleJPanel(), "ROLES");
@@ -516,6 +535,12 @@ public class DashboardJFrame extends JFrame {
         panel.add(header, BorderLayout.NORTH);
         panel.add(cards, BorderLayout.CENTER);
 
+        return panel;
+    }
+
+    private JPanel createAlertasPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(backgroundColor);
         return panel;
     }
 
@@ -692,6 +717,10 @@ public class DashboardJFrame extends JFrame {
 
         if (lblDashboardWelcome != null) {
             lblDashboardWelcome.setText("Bienvenido, " + getSafeDisplayName());
+        }
+
+        if (dashboardPanel != null) {
+            dashboardPanel.setDisplayName(getSafeDisplayName());
         }
 
         if (sidebarAvatar != null) {

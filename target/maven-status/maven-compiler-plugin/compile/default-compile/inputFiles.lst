@@ -6,6 +6,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Confi
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\BrandController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\CategoryController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\ClientController.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\DashboardController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\DocumentTypeController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\EmployeeController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\InventoryController.java
@@ -20,6 +21,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Contr
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\BrandDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\CategoryDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\ClientDAO.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\DashboardDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\DocumentTypeDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\EmployeeDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\InventoryDAO.java
@@ -34,6 +36,10 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\U
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Brand.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Category.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Client.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DashboardAlertItem.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DashboardChartItem.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DashboardLatestSale.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DashboardSummary.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\DocumentType.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Employee.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\InventoryMetrics.java
@@ -60,6 +66,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\CategoryJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\ClientJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\DashboardJFrame.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\DashboardJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\DocumentTypeJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\EmployeeJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\InventoryJPanel.java
@@ -75,3 +82,4 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SectionRefreshable.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\StockMovementJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\SupplierJPanel.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Views\UserJPanel.java
