@@ -5911,3 +5911,743 @@ END$$
 
 
 DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_user_management_create(
+    IN p_user_name VARCHAR(100),
+    IN p_full_name VARCHAR(150),
+    IN p_email VARCHAR(150),
+    IN p_phone VARCHAR(20),
+    IN p_profile_image_path VARCHAR(500),
+    IN p_password VARCHAR(255),
+    IN p_status TINYINT
+)
+BEGIN
+    IF p_user_name IS NULL OR TRIM(p_user_name) = '' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ingrese un nombre de usuario.';
+    END IF;
+
+    IF p_password IS NULL OR TRIM(p_password) = '' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ingrese una contrasena valida.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM users
+        WHERE LOWER(user_name) = LOWER(TRIM(p_user_name))
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El nombre de usuario ya existe.';
+    END IF;
+
+    INSERT INTO users (
+        user_name,
+        full_name,
+        email,
+        phone,
+        profile_image_path,
+        password,
+        status,
+        created_at,
+        updated_at
+    )
+    VALUES (
+        TRIM(p_user_name),
+        NULLIF(TRIM(p_full_name), ''),
+        NULLIF(TRIM(p_email), ''),
+        NULLIF(TRIM(p_phone), ''),
+        NULLIF(TRIM(p_profile_image_path), ''),
+        p_password,
+        IFNULL(p_status, 1),
+        NOW(),
+        NOW()
+    );
+END$$
+
+CREATE PROCEDURE sp_user_management_update(
+    IN p_id_user INT,
+    IN p_user_name VARCHAR(100),
+    IN p_full_name VARCHAR(150),
+    IN p_email VARCHAR(150),
+    IN p_phone VARCHAR(20),
+    IN p_profile_image_path VARCHAR(500),
+    IN p_password VARCHAR(255),
+    IN p_status TINYINT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id_user = p_id_user
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se encontro el usuario.';
+    END IF;
+
+    IF p_user_name IS NULL OR TRIM(p_user_name) = '' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ingrese un nombre de usuario.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM users
+        WHERE LOWER(user_name) = LOWER(TRIM(p_user_name))
+          AND id_user <> p_id_user
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El nombre de usuario ya esta en uso.';
+    END IF;
+
+    UPDATE users
+    SET
+        user_name = TRIM(p_user_name),
+        full_name = NULLIF(TRIM(p_full_name), ''),
+        email = NULLIF(TRIM(p_email), ''),
+        phone = NULLIF(TRIM(p_phone), ''),
+        profile_image_path = NULLIF(TRIM(p_profile_image_path), ''),
+        password = CASE
+            WHEN p_password IS NULL OR TRIM(p_password) = '' THEN password
+            ELSE p_password
+        END,
+        status = IFNULL(p_status, 1),
+        updated_at = NOW()
+    WHERE id_user = p_id_user;
+END$$
+
+CREATE PROCEDURE sp_user_management_list(
+    IN p_search VARCHAR(200),
+    IN p_page INT,
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_search VARCHAR(200) DEFAULT '';
+    DECLARE v_page INT DEFAULT 1;
+    DECLARE v_limit INT DEFAULT 10;
+    DECLARE v_offset INT DEFAULT 0;
+
+    SET v_search = IFNULL(TRIM(p_search), '');
+    SET v_page = IFNULL(p_page, 1);
+    SET v_limit = IFNULL(p_limit, 10);
+
+    IF v_page < 1 THEN
+        SET v_page = 1;
+    END IF;
+
+    IF v_limit NOT IN (10, 20, 50) THEN
+        SET v_limit = 10;
+    END IF;
+
+    SET v_offset = (v_page - 1) * v_limit;
+
+    SELECT
+        u.id_user,
+        u.user_name,
+        u.full_name,
+        u.email,
+        u.phone,
+        u.profile_image_path,
+        u.password,
+        u.status,
+        u.created_at,
+        u.updated_at
+    FROM users u
+    WHERE v_search = ''
+       OR u.user_name LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.full_name, '') LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.email, '') LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.phone, '') LIKE CONCAT('%', v_search, '%')
+       OR CASE WHEN u.status = 1 THEN 'Activo' ELSE 'Inactivo' END LIKE CONCAT('%', v_search, '%')
+    ORDER BY u.id_user DESC
+    LIMIT v_offset, v_limit;
+END$$
+
+CREATE PROCEDURE sp_user_management_count(
+    IN p_search VARCHAR(200)
+)
+BEGIN
+    DECLARE v_search VARCHAR(200) DEFAULT '';
+
+    SET v_search = IFNULL(TRIM(p_search), '');
+
+    SELECT COUNT(*) AS total
+    FROM users u
+    WHERE v_search = ''
+       OR u.user_name LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.full_name, '') LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.email, '') LIKE CONCAT('%', v_search, '%')
+       OR IFNULL(u.phone, '') LIKE CONCAT('%', v_search, '%')
+       OR CASE WHEN u.status = 1 THEN 'Activo' ELSE 'Inactivo' END LIKE CONCAT('%', v_search, '%');
+END$$
+
+CREATE PROCEDURE sp_user_management_find_by_id(
+    IN p_id_user INT
+)
+BEGIN
+    SELECT
+        u.id_user,
+        u.user_name,
+        u.full_name,
+        u.email,
+        u.phone,
+        u.profile_image_path,
+        u.password,
+        u.status,
+        u.created_at,
+        u.updated_at
+    FROM users u
+    WHERE u.id_user = p_id_user
+    LIMIT 1;
+END$$
+
+CREATE PROCEDURE sp_user_management_delete_physical(
+    IN p_id_user INT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id_user = p_id_user
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se encontro el usuario.';
+    END IF;
+
+    DELETE FROM users
+    WHERE id_user = p_id_user;
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_dashboard_summary(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+    DECLARE v_days INT DEFAULT 1;
+    DECLARE v_previous_from DATE;
+    DECLARE v_previous_to DATE;
+
+    DECLARE v_current_total DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_previous_total DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_day_total DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_yesterday_total DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_current_orders INT DEFAULT 0;
+    DECLARE v_previous_orders INT DEFAULT 0;
+    DECLARE v_current_clients INT DEFAULT 0;
+    DECLARE v_previous_clients INT DEFAULT 0;
+    DECLARE v_current_products INT DEFAULT 0;
+    DECLARE v_previous_products INT DEFAULT 0;
+    DECLARE v_current_ticket DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_previous_ticket DECIMAL(14,2) DEFAULT 0;
+    DECLARE v_low_stock INT DEFAULT 0;
+    DECLARE v_out_stock INT DEFAULT 0;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    SET v_days = GREATEST(1, DATEDIFF(v_date_to, v_date_from) + 1);
+    SET v_previous_from = DATE_SUB(v_date_from, INTERVAL v_days DAY);
+    SET v_previous_to = DATE_SUB(v_date_from, INTERVAL 1 DAY);
+
+    SELECT
+        COALESCE(SUM(s.total), 0),
+        COUNT(*),
+        COALESCE(AVG(s.total), 0)
+    INTO
+        v_current_total,
+        v_current_orders,
+        v_current_ticket
+    FROM sales s
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to;
+
+    SELECT
+        COALESCE(SUM(s.total), 0),
+        COUNT(*),
+        COALESCE(AVG(s.total), 0)
+    INTO
+        v_previous_total,
+        v_previous_orders,
+        v_previous_ticket
+    FROM sales s
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_previous_from AND v_previous_to;
+
+    SELECT COALESCE(SUM(s.total), 0)
+    INTO v_day_total
+    FROM sales s
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) = CURDATE();
+
+    SELECT COALESCE(SUM(s.total), 0)
+    INTO v_yesterday_total
+    FROM sales s
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY);
+
+    SELECT COUNT(*)
+    INTO v_current_clients
+    FROM clients c
+    WHERE c.status = 1
+      AND c.deleted_at IS NULL
+      AND DATE(COALESCE(c.created_at, NOW())) BETWEEN v_date_from AND v_date_to;
+
+    SELECT COUNT(*)
+    INTO v_previous_clients
+    FROM clients c
+    WHERE c.status = 1
+      AND c.deleted_at IS NULL
+      AND DATE(COALESCE(c.created_at, NOW())) BETWEEN v_previous_from AND v_previous_to;
+
+    SELECT COALESCE(SUM(sd.quantity), 0)
+    INTO v_current_products
+    FROM sales s
+    INNER JOIN sale_details sd
+        ON sd.id_sale = s.id_sale
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to;
+
+    SELECT COALESCE(SUM(sd.quantity), 0)
+    INTO v_previous_products
+    FROM sales s
+    INNER JOIN sale_details sd
+        ON sd.id_sale = s.id_sale
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_previous_from AND v_previous_to;
+
+    SELECT
+        COALESCE(SUM(CASE WHEN p.stock > 0 AND p.stock <= 5 THEN 1 ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN p.stock = 0 THEN 1 ELSE 0 END), 0)
+    INTO
+        v_low_stock,
+        v_out_stock
+    FROM products p
+    WHERE p.status = 1
+      AND p.deleted_at IS NULL;
+
+    SELECT
+        v_current_total AS total_sales,
+        CASE
+            WHEN v_previous_total = 0 THEN IF(v_current_total = 0, 0, 100)
+            ELSE ROUND(((v_current_total - v_previous_total) / v_previous_total) * 100, 1)
+        END AS total_sales_growth,
+        v_day_total AS day_sales,
+        CASE
+            WHEN v_yesterday_total = 0 THEN IF(v_day_total = 0, 0, 100)
+            ELSE ROUND(((v_day_total - v_yesterday_total) / v_yesterday_total) * 100, 1)
+        END AS day_sales_growth,
+        v_current_orders AS orders,
+        CASE
+            WHEN v_previous_orders = 0 THEN IF(v_current_orders = 0, 0, 100)
+            ELSE ROUND(((v_current_orders - v_previous_orders) / v_previous_orders) * 100, 1)
+        END AS orders_growth,
+        v_current_clients AS new_clients,
+        CASE
+            WHEN v_previous_clients = 0 THEN IF(v_current_clients = 0, 0, 100)
+            ELSE ROUND(((v_current_clients - v_previous_clients) / v_previous_clients) * 100, 1)
+        END AS new_clients_growth,
+        v_current_products AS products_sold,
+        CASE
+            WHEN v_previous_products = 0 THEN IF(v_current_products = 0, 0, 100)
+            ELSE ROUND(((v_current_products - v_previous_products) / v_previous_products) * 100, 1)
+        END AS products_sold_growth,
+        v_current_ticket AS average_ticket,
+        CASE
+            WHEN v_previous_ticket = 0 THEN IF(v_current_ticket = 0, 0, 100)
+            ELSE ROUND(((v_current_ticket - v_previous_ticket) / v_previous_ticket) * 100, 1)
+        END AS average_ticket_growth,
+        v_low_stock AS low_stock_products,
+        v_out_stock AS out_of_stock_products;
+END$$
+
+CREATE PROCEDURE sp_dashboard_sales_by_day(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    IF v_date_from = v_date_to THEN
+        WITH RECURSIVE hour_range AS (
+            SELECT 0 AS hour_value
+            UNION ALL
+            SELECT hour_value + 1
+            FROM hour_range
+            WHERE hour_value < 23
+        )
+        SELECT
+            CONCAT(LPAD(h.hour_value, 2, '0'), ':00') AS label,
+            COALESCE(SUM(s.total), 0) AS amount,
+            COUNT(s.id_sale) AS quantity
+        FROM hour_range h
+        LEFT JOIN sales s
+            ON DATE(s.sale_date) = v_date_from
+           AND HOUR(s.sale_date) = h.hour_value
+           AND s.status = 1
+           AND s.deleted_at IS NULL
+        GROUP BY h.hour_value
+        ORDER BY h.hour_value ASC;
+    ELSE
+        WITH RECURSIVE date_range AS (
+            SELECT v_date_from AS day_value
+            UNION ALL
+            SELECT DATE_ADD(day_value, INTERVAL 1 DAY)
+            FROM date_range
+            WHERE day_value < v_date_to
+        )
+        SELECT
+            DATE_FORMAT(d.day_value, '%d/%m') AS label,
+            COALESCE(SUM(s.total), 0) AS amount,
+            COUNT(s.id_sale) AS quantity
+        FROM date_range d
+        LEFT JOIN sales s
+            ON DATE(s.sale_date) = d.day_value
+           AND s.status = 1
+           AND s.deleted_at IS NULL
+        GROUP BY d.day_value
+        ORDER BY d.day_value ASC;
+    END IF;
+END$$
+
+CREATE PROCEDURE sp_dashboard_sales_by_category(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    SELECT
+        COALESCE(c.name, 'Sin categoria') AS label,
+        COALESCE(SUM(sd.subtotal), 0) AS amount,
+        COALESCE(SUM(sd.quantity), 0) AS quantity
+    FROM sales s
+    INNER JOIN sale_details sd
+        ON sd.id_sale = s.id_sale
+    INNER JOIN products p
+        ON p.id_product = sd.id_product
+    LEFT JOIN categories c
+        ON c.id_category = p.id_category
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to
+    GROUP BY COALESCE(c.name, 'Sin categoria')
+    ORDER BY amount DESC;
+END$$
+
+CREATE PROCEDURE sp_dashboard_top_products(
+    IN p_date_from DATE,
+    IN p_date_to DATE,
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+    DECLARE v_limit INT DEFAULT 5;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+    SET v_limit = IFNULL(p_limit, 5);
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    IF v_limit <= 0 THEN
+        SET v_limit = 5;
+    END IF;
+
+    SELECT
+        p.name AS label,
+        COALESCE(SUM(sd.subtotal), 0) AS amount,
+        COALESCE(SUM(sd.quantity), 0) AS quantity
+    FROM sales s
+    INNER JOIN sale_details sd
+        ON sd.id_sale = s.id_sale
+    INNER JOIN products p
+        ON p.id_product = sd.id_product
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to
+    GROUP BY p.id_product, p.name
+    ORDER BY amount DESC, quantity DESC
+    LIMIT v_limit;
+END$$
+
+CREATE PROCEDURE sp_dashboard_sales_by_hour(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    WITH RECURSIVE hour_range AS (
+        SELECT 0 AS hour_value
+        UNION ALL
+        SELECT hour_value + 1
+        FROM hour_range
+        WHERE hour_value < 23
+    )
+    SELECT
+        LPAD(h.hour_value, 2, '0') AS label,
+        COALESCE(SUM(s.total), 0) AS amount,
+        COUNT(s.id_sale) AS quantity
+    FROM hour_range h
+    LEFT JOIN sales s
+        ON HOUR(s.sale_date) = h.hour_value
+       AND s.status = 1
+       AND s.deleted_at IS NULL
+       AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to
+    GROUP BY h.hour_value
+    ORDER BY h.hour_value ASC;
+END$$
+
+CREATE PROCEDURE sp_dashboard_sales_comparison(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+    DECLARE v_days INT DEFAULT 1;
+    DECLARE v_previous_from DATE;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    IF v_date_from = v_date_to THEN
+        WITH RECURSIVE hour_range AS (
+            SELECT 0 AS hour_value
+            UNION ALL
+            SELECT hour_value + 1
+            FROM hour_range
+            WHERE hour_value < 23
+        )
+        SELECT
+            CONCAT(LPAD(h.hour_value, 2, '0'), ':00') AS label,
+            COALESCE((
+                SELECT SUM(s.total)
+                FROM sales s
+                WHERE s.status = 1
+                  AND s.deleted_at IS NULL
+                  AND DATE(s.sale_date) = v_date_from
+                  AND HOUR(s.sale_date) = h.hour_value
+            ), 0) AS amount,
+            COALESCE((
+                SELECT SUM(s.total)
+                FROM sales s
+                WHERE s.status = 1
+                  AND s.deleted_at IS NULL
+                  AND DATE(s.sale_date) = DATE_SUB(v_date_from, INTERVAL 1 DAY)
+                  AND HOUR(s.sale_date) = h.hour_value
+            ), 0) AS comparison_amount
+        FROM hour_range h
+        ORDER BY h.hour_value ASC;
+    ELSE
+        SET v_days = GREATEST(1, DATEDIFF(v_date_to, v_date_from) + 1);
+        SET v_previous_from = DATE_SUB(v_date_from, INTERVAL v_days DAY);
+
+        WITH RECURSIVE offsets AS (
+            SELECT 0 AS offset_value
+            UNION ALL
+            SELECT offset_value + 1
+            FROM offsets
+            WHERE offset_value + 1 < v_days
+        )
+        SELECT
+            DATE_FORMAT(DATE_ADD(v_date_from, INTERVAL o.offset_value DAY), '%d/%m') AS label,
+            COALESCE((
+                SELECT SUM(s.total)
+                FROM sales s
+                WHERE s.status = 1
+                  AND s.deleted_at IS NULL
+                  AND DATE(s.sale_date) = DATE_ADD(v_date_from, INTERVAL o.offset_value DAY)
+            ), 0) AS amount,
+            COALESCE((
+                SELECT SUM(s.total)
+                FROM sales s
+                WHERE s.status = 1
+                  AND s.deleted_at IS NULL
+                  AND DATE(s.sale_date) = DATE_ADD(v_previous_from, INTERVAL o.offset_value DAY)
+            ), 0) AS comparison_amount
+        FROM offsets o
+        ORDER BY o.offset_value ASC;
+    END IF;
+END$$
+
+CREATE PROCEDURE sp_dashboard_payment_methods(
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_date_from DATE;
+    DECLARE v_date_to DATE;
+
+    SET v_date_from = COALESCE(p_date_from, CURDATE());
+    SET v_date_to = COALESCE(p_date_to, CURDATE());
+
+    IF v_date_from > v_date_to THEN
+        SET v_date_from = v_date_to;
+    END IF;
+
+    SELECT
+        pm.name AS label,
+        COALESCE(SUM(s.total), 0) AS amount,
+        COUNT(s.id_sale) AS quantity
+    FROM sales s
+    INNER JOIN payment_methods pm
+        ON pm.id_payment_method = s.id_payment_method
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+      AND DATE(s.sale_date) BETWEEN v_date_from AND v_date_to
+    GROUP BY pm.id_payment_method, pm.name
+    ORDER BY amount DESC;
+END$$
+
+CREATE PROCEDURE sp_dashboard_latest_sales(
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_limit INT DEFAULT 5;
+
+    SET v_limit = IFNULL(p_limit, 5);
+
+    IF v_limit <= 0 THEN
+        SET v_limit = 5;
+    END IF;
+
+    SELECT
+        s.sale_date,
+        s.voucher_code,
+        COALESCE(NULLIF(TRIM(s.customer_name), ''), 'Cliente no registrado') AS customer_name,
+        s.total,
+        pm.name AS payment_method_name
+    FROM sales s
+    INNER JOIN payment_methods pm
+        ON pm.id_payment_method = s.id_payment_method
+    WHERE s.status = 1
+      AND s.deleted_at IS NULL
+    ORDER BY s.sale_date DESC, s.id_sale DESC
+    LIMIT v_limit;
+END$$
+
+CREATE PROCEDURE sp_dashboard_alerts(
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_limit INT DEFAULT 4;
+
+    SET v_limit = IFNULL(p_limit, 4);
+
+    IF v_limit <= 0 THEN
+        SET v_limit = 4;
+    END IF;
+
+    SELECT
+        severity,
+        message,
+        alert_time
+    FROM (
+        SELECT
+            1 AS sort_weight,
+            'CRITICAL' AS severity,
+            CONCAT('Stock agotado: ', COUNT(*), ' productos sin unidades') AS message,
+            NOW() AS alert_time
+        FROM products p
+        WHERE p.status = 1
+          AND p.deleted_at IS NULL
+          AND p.stock = 0
+        HAVING COUNT(*) > 0
+
+        UNION ALL
+
+        SELECT
+            2 AS sort_weight,
+            'WARNING' AS severity,
+            CONCAT('Stock bajo: ', COUNT(*), ' productos requieren atencion') AS message,
+            NOW() AS alert_time
+        FROM products p
+        WHERE p.status = 1
+          AND p.deleted_at IS NULL
+          AND p.stock > 0
+          AND p.stock <= 5
+        HAVING COUNT(*) > 0
+
+        UNION ALL
+
+        SELECT
+            3 AS sort_weight,
+            'INFO' AS severity,
+            CONCAT('Ultima venta registrada: ', last_sale.voucher_code, ' por S/ ', FORMAT(last_sale.total, 2)) AS message,
+            last_sale.sale_date AS alert_time
+        FROM (
+            SELECT s.voucher_code, s.total, s.sale_date
+            FROM sales s
+            WHERE s.status = 1
+              AND s.deleted_at IS NULL
+            ORDER BY s.sale_date DESC, s.id_sale DESC
+            LIMIT 1
+        ) last_sale
+
+        UNION ALL
+
+        SELECT
+            4 AS sort_weight,
+            'SUCCESS' AS severity,
+            CONCAT('Inventario valorizado: S/ ', FORMAT(COALESCE(SUM(p.price * p.stock), 0), 2)) AS message,
+            NOW() AS alert_time
+        FROM products p
+        WHERE p.status = 1
+          AND p.deleted_at IS NULL
+        HAVING COUNT(*) > 0
+    ) alerts
+    ORDER BY sort_weight ASC
+    LIMIT v_limit;
+END$$
+
+DELIMITER ;
