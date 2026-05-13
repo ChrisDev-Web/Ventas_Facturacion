@@ -124,6 +124,18 @@ public class UserDAO {
         return null;
     }
 
+    public void logout(int idUser) throws SQLException {
+        String sql = "{CALL sp_user_logout(?)}";
+
+        try (
+            Connection connection = Database.getConnection();
+            CallableStatement statement = connection.prepareCall(sql)
+        ) {
+            statement.setInt(1, idUser);
+            statement.execute();
+        }
+    }
+
     public User findById(int idUser) throws SQLException {
         String sql = "{CALL sp_user_profile_find_by_id(?)}";
 

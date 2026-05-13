@@ -163,6 +163,18 @@ public class UserController {
         }
     }
 
+    public void logoutUser(int idUser) throws Exception {
+        if (idUser <= 0) {
+            throw new Exception("Usuario no valido.");
+        }
+
+        try {
+            userDAO.logout(idUser);
+        } catch (SQLException e) {
+            throw new Exception(getSqlMessage(e));
+        }
+    }
+
     public User findUserProfile(int idUser) throws Exception {
         if (idUser <= 0) {
             throw new Exception("Usuario no válido.");
