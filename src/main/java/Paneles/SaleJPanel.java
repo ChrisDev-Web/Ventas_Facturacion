@@ -6,6 +6,8 @@ import Models.Sale;
 import Models.SaleDetail;
 import Models.SaleProductItem;
 import Models.SelectOption;
+import Presentacion.DashboardJFrame;
+import Presentacion.DashboardWindowSupport;
 import Services.VoucherPrintService;
 import Presentacion.SectionRefreshable;
 import com.github.lgooddatepicker.zinternaltools.WrapLayout;
@@ -899,6 +901,8 @@ public class SaleJPanel extends JPanel implements SectionRefreshable {
                     JOptionPane.INFORMATION_MESSAGE
             );
 
+            notifyStockAlertsChanged();
+
             cart.clear();
             selectedClientId = null;
             txtPaidAmount.setText("");
@@ -959,6 +963,14 @@ public class SaleJPanel extends JPanel implements SectionRefreshable {
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void notifyStockAlertsChanged() {
+        DashboardJFrame dashboardFrame = DashboardWindowSupport.findDashboardFrame(this);
+
+        if (dashboardFrame != null) {
+            dashboardFrame.triggerStockAlertRefresh();
+        }
     }
 
     private static class CartItem {

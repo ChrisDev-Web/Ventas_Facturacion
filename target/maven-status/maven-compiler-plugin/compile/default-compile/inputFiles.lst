@@ -3,6 +3,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Confi
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\Database.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\DecolectaConfig.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Config\PasswordUtil.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\AlertController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\BrandController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\CategoryController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\ClientController.java
@@ -18,6 +19,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Contr
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\StockMovementController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\SupplierController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\UserController.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\AlertDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\BrandDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\CategoryDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\ClientDAO.java
@@ -55,10 +57,13 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Model
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\SaleProductItem.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\SaleRanking.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\SelectOption.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\StockAlert.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\StockAlertSummary.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\StockMovement.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\SunatCompany.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Supplier.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\User.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\AlertsJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\BrandJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\CatalogJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\CategoryJPanel.java
@@ -78,8 +83,10 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Panel
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\SupplierJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\UserJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\DashboardJFrame.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\DashboardWindowSupport.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\LoginJFrame.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\RegisterJFrame.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\SectionRefreshable.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Presentacion\StockAlertToastPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Services\DecolectaService.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Services\VoucherPrintService.java

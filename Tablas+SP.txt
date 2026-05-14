@@ -1165,59 +1165,36 @@ BEGIN
         alert_time
     FROM (
         SELECT
-            1 AS sort_weight,
-            'CRITICAL' AS severity,
-            CONCAT('Stock agotado: ', COUNT(*), ' productos sin unidades') AS message,
-            NOW() AS alert_time
+            CASE
+                WHEN p.stock = 0 THEN 'URGENT'
+                WHEN p.stock <= 5 THEN 'CRITICAL'
+                ELSE 'WARNING'
+            END AS severity,
+            CONCAT(
+                p.name,
+                ' con stock ',
+                p.stock,
+                '. ',
+                CASE
+                    WHEN p.stock = 0 THEN 'Renovar stock de forma urgente.'
+                    WHEN p.stock <= 5 THEN 'Stock critico, renovar de inmediato.'
+                    ELSE 'Advertencia de stock bajo.'
+                END
+            ) AS message,
+            COALESCE(p.updated_at, p.created_at, NOW()) AS alert_time,
+            CASE
+                WHEN p.stock = 0 THEN 1
+                WHEN p.stock <= 5 THEN 2
+                ELSE 3
+            END AS sort_weight,
+            p.stock,
+            p.name
         FROM products p
         WHERE p.status = 1
           AND p.deleted_at IS NULL
-          AND p.stock = 0
-        HAVING COUNT(*) > 0
-
-        UNION ALL
-
-        SELECT
-            2 AS sort_weight,
-            'WARNING' AS severity,
-            CONCAT('Stock bajo: ', COUNT(*), ' productos requieren atencion') AS message,
-            NOW() AS alert_time
-        FROM products p
-        WHERE p.status = 1
-          AND p.deleted_at IS NULL
-          AND p.stock > 0
-          AND p.stock <= 5
-        HAVING COUNT(*) > 0
-
-        UNION ALL
-
-        SELECT
-            3 AS sort_weight,
-            'INFO' AS severity,
-            CONCAT('Ultima venta registrada: ', last_sale.voucher_code, ' por S/ ', FORMAT(last_sale.total, 2)) AS message,
-            last_sale.sale_date AS alert_time
-        FROM (
-            SELECT s.voucher_code, s.total, s.sale_date
-            FROM sales s
-            WHERE s.status = 1
-              AND s.deleted_at IS NULL
-            ORDER BY s.sale_date DESC, s.id_sale DESC
-            LIMIT 1
-        ) last_sale
-
-        UNION ALL
-
-        SELECT
-            4 AS sort_weight,
-            'SUCCESS' AS severity,
-            CONCAT('Inventario valorizado: S/ ', FORMAT(COALESCE(SUM(p.price * p.stock), 0), 2)) AS message,
-            NOW() AS alert_time
-        FROM products p
-        WHERE p.status = 1
-          AND p.deleted_at IS NULL
-        HAVING COUNT(*) > 0
+          AND p.stock <= 10
     ) alerts
-    ORDER BY sort_weight ASC
+    ORDER BY sort_weight ASC, stock ASC, alert_time DESC, name ASC
     LIMIT v_limit;
 END $$
 
@@ -1590,7 +1567,7 @@ BEGIN
       AND DATE(s.sale_date) BETWEEN v_previous_from AND v_previous_to;
 
     SELECT
-        COALESCE(SUM(CASE WHEN p.stock > 0 AND p.stock <= 5 THEN 1 ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN p.stock > 0 AND p.stock <= 10 THEN 1 ELSE 0 END), 0),
         COALESCE(SUM(CASE WHEN p.stock = 0 THEN 1 ELSE 0 END), 0)
     INTO
         v_low_stock,
@@ -6387,6 +6364,161 @@ BEGIN
             NULL
         );
     END IF;
+END $$
+
+DELIMITER ;
+
+-- SP ALERTAS
+
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_alerts_low_stock_summary`()
+BEGIN
+    SELECT
+        COALESCE(SUM(CASE WHEN p.stock > 5 AND p.stock <= 10 THEN 1 ELSE 0 END), 0) AS warning_count,
+        COALESCE(SUM(CASE WHEN p.stock > 0 AND p.stock <= 5 THEN 1 ELSE 0 END), 0) AS critical_count,
+        COALESCE(SUM(CASE WHEN p.stock = 0 THEN 1 ELSE 0 END), 0) AS urgent_count,
+        COALESCE(SUM(CASE WHEN p.stock <= 10 THEN 1 ELSE 0 END), 0) AS total_alerts
+    FROM products p
+    WHERE p.status = 1
+      AND p.deleted_at IS NULL;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_alerts_low_stock_count`(
+    IN p_search VARCHAR(200),
+    IN p_severity VARCHAR(20)
+)
+BEGIN
+    DECLARE v_search VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '';
+    DECLARE v_severity VARCHAR(20) DEFAULT 'TODOS';
+
+    SET v_search = CONVERT(TRIM(IFNULL(p_search, '')) USING utf8mb4) COLLATE utf8mb4_general_ci;
+    SET v_severity = UPPER(TRIM(IFNULL(p_severity, 'TODOS')));
+
+    SELECT COUNT(*) AS total
+    FROM products p
+    INNER JOIN categories c
+        ON c.id_category = p.id_category
+    INNER JOIN brands b
+        ON b.id_brand = p.id_brand
+    WHERE p.status = 1
+      AND p.deleted_at IS NULL
+      AND p.stock <= 10
+      AND (
+            v_severity = ''
+            OR v_severity = 'TODOS'
+            OR (
+                v_severity = 'WARNING'
+                AND p.stock > 5
+                AND p.stock <= 10
+            )
+            OR (
+                v_severity = 'CRITICAL'
+                AND p.stock > 0
+                AND p.stock <= 5
+            )
+            OR (
+                v_severity = 'URGENT'
+                AND p.stock = 0
+            )
+      )
+      AND (
+            v_search = ''
+            OR p.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR c.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR b.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR CAST(p.stock AS CHAR) COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+      );
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_alerts_low_stock_list`(
+    IN p_search VARCHAR(200),
+    IN p_severity VARCHAR(20),
+    IN p_page INT,
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+    DECLARE v_search VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '';
+    DECLARE v_severity VARCHAR(20) DEFAULT 'TODOS';
+
+    SET v_search = CONVERT(TRIM(IFNULL(p_search, '')) USING utf8mb4) COLLATE utf8mb4_general_ci;
+    SET v_severity = UPPER(TRIM(IFNULL(p_severity, 'TODOS')));
+
+    IF p_page IS NULL OR p_page < 1 THEN
+        SET p_page = 1;
+    END IF;
+
+    IF p_limit NOT IN (10, 20, 50) THEN
+        SET p_limit = 10;
+    END IF;
+
+    SET v_offset = (p_page - 1) * p_limit;
+
+    SELECT
+        p.id_product,
+        p.name AS product_name,
+        c.name AS category_name,
+        b.name AS brand_name,
+        p.stock,
+        CASE
+            WHEN p.stock = 0 THEN 'URGENT'
+            WHEN p.stock <= 5 THEN 'CRITICAL'
+            ELSE 'WARNING'
+        END AS severity,
+        CASE
+            WHEN p.stock = 0 THEN 'Stock urgente'
+            WHEN p.stock <= 5 THEN 'Stock critico'
+            ELSE 'Advertencia'
+        END AS severity_label,
+        CASE
+            WHEN p.stock = 0 THEN 'Renovar stock de forma urgente.'
+            WHEN p.stock <= 5 THEN 'Stock critico. Reponer de inmediato.'
+            ELSE 'Advertencia de stock bajo. Programar reposicion.'
+        END AS recommended_action,
+        COALESCE(p.updated_at, p.created_at, NOW()) AS alert_time
+    FROM products p
+    INNER JOIN categories c
+        ON c.id_category = p.id_category
+    INNER JOIN brands b
+        ON b.id_brand = p.id_brand
+    WHERE p.status = 1
+      AND p.deleted_at IS NULL
+      AND p.stock <= 10
+      AND (
+            v_severity = ''
+            OR v_severity = 'TODOS'
+            OR (
+                v_severity = 'WARNING'
+                AND p.stock > 5
+                AND p.stock <= 10
+            )
+            OR (
+                v_severity = 'CRITICAL'
+                AND p.stock > 0
+                AND p.stock <= 5
+            )
+            OR (
+                v_severity = 'URGENT'
+                AND p.stock = 0
+            )
+      )
+      AND (
+            v_search = ''
+            OR p.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR c.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR b.name COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR CAST(p.stock AS CHAR) COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+      )
+    ORDER BY
+        CASE
+            WHEN p.stock = 0 THEN 1
+            WHEN p.stock <= 5 THEN 2
+            ELSE 3
+        END ASC,
+        p.stock ASC,
+        COALESCE(p.updated_at, p.created_at, NOW()) DESC,
+        p.name ASC
+    LIMIT v_offset, p_limit;
 END $$
 
 DELIMITER ;

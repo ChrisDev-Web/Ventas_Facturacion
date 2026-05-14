@@ -1,9 +1,12 @@
 package Presentacion;
 
+import Controllers.AlertController;
 import Controllers.UserController;
+import Models.StockAlert;
 import Paneles.EmployeeJPanel;
 import Paneles.UserJPanel;
 import Paneles.SupplierJPanel;
+import Paneles.AlertsJPanel;
 import Paneles.LocationJPanel;
 import Paneles.SaleHistoryJPanel;
 import Paneles.ProductJPanel;
@@ -40,8 +43,12 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -56,6 +63,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.UIManager;
+import javax.swing.SwingWorker;
 import jiconfont.icons.font_awesome.FontAwesome;
 import jiconfont.swing.IconFontSwing;
 
@@ -78,6 +86,7 @@ public class DashboardJFrame extends JFrame {
     private JLabel lblSidebarUserName;
     private JLabel lblDashboardWelcome;
     private DashboardJPanel dashboardPanel;
+    private AlertsJPanel alertsPanel;
 
     private SideMenuItem itemDashboard;
     private SideMenuItem itemAlertas;
@@ -103,6 +112,16 @@ public class DashboardJFrame extends JFrame {
 
     private boolean configExpanded = false;
     private Timer configTimer;
+    private Timer lowStockMonitorTimer;
+    private Timer toastTimer;
+    private boolean checkingStockAlerts = false;
+    private boolean pendingStockAlertCheck = false;
+    private boolean pendingToastCheck = false;
+    private boolean stockAlertStateInitialized = false;
+    private final AlertController alertController = new AlertController();
+    private final Map<Integer, String> trackedAlertSeverities = new HashMap<>();
+    private final Deque<StockAlert> toastQueue = new ArrayDeque<>();
+    private StockAlertToastPanel activeToastPanel;
 
     private final int configFullHeight = 260;
 
@@ -195,6 +214,8 @@ public class DashboardJFrame extends JFrame {
         setContentPane(mainPanel);
 
         showSection("DASHBOARD", itemDashboard);
+        requestLowStockAlertSync(false);
+        startLowStockAlertMonitor();
     }
 
     private JPanel createSidebar() {
@@ -530,9 +551,10 @@ public class DashboardJFrame extends JFrame {
                 () -> showSection("HISTORIAL_VENTAS", itemHistorialVentas),
                 () -> showSection("ALERTAS", itemAlertas)
         );
+        alertsPanel = new AlertsJPanel();
 
         contentPanel.add(dashboardPanel, "DASHBOARD");
-        contentPanel.add(createAlertasPanel(), "ALERTAS");
+        contentPanel.add(alertsPanel, "ALERTAS");
         contentPanel.add(new SaleJPanel(getSafeUserId(), getSafeUserName()), "VENTAS");
         contentPanel.add(new SaleHistoryJPanel(), "HISTORIAL_VENTAS");
         contentPanel.add(new ProductJPanel(), "PRODUCTOS");
@@ -590,6 +612,11 @@ public class DashboardJFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(backgroundColor);
         return panel;
+    }
+
+    public void triggerStockAlertRefresh() {
+        requestLowStockAlertSync(true);
+        refreshAlertSectionsIfVisible();
     }
 
     private JPanel createSectionPanel(String title, String description) {
@@ -663,6 +690,156 @@ public class DashboardJFrame extends JFrame {
 
             break;
         }
+    }
+
+    private void startLowStockAlertMonitor() {
+        lowStockMonitorTimer = new Timer(2500, e -> requestLowStockAlertSync(true));
+        lowStockMonitorTimer.start();
+    }
+
+    private void requestLowStockAlertSync(boolean showToasts) {
+        if (checkingStockAlerts) {
+            pendingStockAlertCheck = true;
+            pendingToastCheck = pendingToastCheck || showToasts;
+            return;
+        }
+
+        checkingStockAlerts = true;
+
+        new SwingWorker<List<StockAlert>, Void>() {
+            @Override
+            protected List<StockAlert> doInBackground() throws Exception {
+                return alertController.listActiveAlerts(50);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    processLowStockAlerts(get(), showToasts);
+                } catch (Exception ignored) {
+                    // Si la consulta falla no interrumpimos la navegacion del usuario.
+                } finally {
+                    checkingStockAlerts = false;
+
+                    if (pendingStockAlertCheck) {
+                        boolean nextShowToasts = pendingToastCheck;
+                        pendingStockAlertCheck = false;
+                        pendingToastCheck = false;
+                        requestLowStockAlertSync(nextShowToasts);
+                    }
+                }
+            }
+        }.execute();
+    }
+
+    private void processLowStockAlerts(List<StockAlert> alerts, boolean showToasts) {
+        Map<Integer, String> currentSeverities = new HashMap<>();
+        boolean alertsChanged;
+
+        for (StockAlert alert : alerts) {
+            currentSeverities.put(alert.getIdProduct(), alert.getSeverity());
+        }
+
+        alertsChanged = !trackedAlertSeverities.equals(currentSeverities);
+
+        if (stockAlertStateInitialized && showToasts) {
+            for (StockAlert alert : alerts) {
+                String previousSeverity = trackedAlertSeverities.get(alert.getIdProduct());
+
+                if (shouldShowToast(previousSeverity, alert.getSeverity())) {
+                    toastQueue.offerLast(alert);
+                }
+            }
+        }
+
+        trackedAlertSeverities.clear();
+        trackedAlertSeverities.putAll(currentSeverities);
+        stockAlertStateInitialized = true;
+
+        if (alertsChanged) {
+            refreshAlertSectionsIfVisible();
+        }
+
+        showNextToastIfNeeded();
+    }
+
+    private boolean shouldShowToast(String previousSeverity, String currentSeverity) {
+        if (currentSeverity == null || currentSeverity.trim().isEmpty()) {
+            return false;
+        }
+
+        if (previousSeverity == null || previousSeverity.trim().isEmpty()) {
+            return true;
+        }
+
+        return severityRank(currentSeverity) > severityRank(previousSeverity);
+    }
+
+    private int severityRank(String severity) {
+        String value = severity == null ? "" : severity.trim().toUpperCase();
+
+        if ("URGENT".equals(value)) {
+            return 3;
+        }
+
+        if ("CRITICAL".equals(value)) {
+            return 2;
+        }
+
+        if ("WARNING".equals(value)) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private void refreshAlertSectionsIfVisible() {
+        if (alertsPanel != null && alertsPanel.isShowing()) {
+            alertsPanel.refreshSectionData();
+        }
+
+        if (dashboardPanel != null && dashboardPanel.isShowing()) {
+            dashboardPanel.refreshSectionData();
+        }
+    }
+
+    private void showNextToastIfNeeded() {
+        if (activeToastPanel != null || toastQueue.isEmpty()) {
+            return;
+        }
+
+        StockAlert nextAlert = toastQueue.pollFirst();
+        activeToastPanel = new StockAlertToastPanel(nextAlert);
+
+        int width = activeToastPanel.getPreferredSize().width;
+        int height = activeToastPanel.getPreferredSize().height;
+        int x = Math.max(10, getLayeredPane().getWidth() - width - 24);
+        int y = 20;
+
+        activeToastPanel.setBounds(x, y, width, height);
+        getLayeredPane().add(activeToastPanel, javax.swing.JLayeredPane.POPUP_LAYER);
+        getLayeredPane().revalidate();
+        getLayeredPane().repaint();
+
+        toastTimer = new Timer(5000, e -> hideActiveToast());
+        toastTimer.setRepeats(false);
+        toastTimer.start();
+    }
+
+    private void hideActiveToast() {
+        if (toastTimer != null) {
+            toastTimer.stop();
+            toastTimer = null;
+        }
+
+        if (activeToastPanel != null) {
+            getLayeredPane().remove(activeToastPanel);
+            getLayeredPane().revalidate();
+            getLayeredPane().repaint();
+            activeToastPanel = null;
+        }
+
+        showNextToastIfNeeded();
     }
 
     private void setActiveMenuItem(SideMenuItem activeItem) {
@@ -777,6 +954,29 @@ public class DashboardJFrame extends JFrame {
         }
 
         return null;
+    }
+
+    @Override
+    public void dispose() {
+        if (lowStockMonitorTimer != null) {
+            lowStockMonitorTimer.stop();
+        }
+
+        toastQueue.clear();
+
+        if (toastTimer != null) {
+            toastTimer.stop();
+            toastTimer = null;
+        }
+
+        if (activeToastPanel != null) {
+            getLayeredPane().remove(activeToastPanel);
+            getLayeredPane().revalidate();
+            getLayeredPane().repaint();
+            activeToastPanel = null;
+        }
+
+        super.dispose();
     }
 
     private void handleProfileUpdated(User updatedUser) {

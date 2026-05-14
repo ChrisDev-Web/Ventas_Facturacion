@@ -22,7 +22,7 @@ public class InventoryDAO {
                 + "COALESCE(SUM(cost * stock), 0) AS total_cost_value, "
                 + "COALESCE(SUM(price * stock), 0) AS total_sale_value, "
                 + "COALESCE(SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END), 0) AS out_of_stock_products, "
-                + "COALESCE(SUM(CASE WHEN stock > 0 AND stock <= 5 THEN 1 ELSE 0 END), 0) AS low_stock_products "
+                + "COALESCE(SUM(CASE WHEN stock > 0 AND stock <= 10 THEN 1 ELSE 0 END), 0) AS low_stock_products "
                 + "FROM products "
                 + "WHERE status = 1 AND deleted_at IS NULL";
 

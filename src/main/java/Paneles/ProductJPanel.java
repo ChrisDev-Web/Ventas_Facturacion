@@ -3,6 +3,8 @@ package Paneles;
 import Controllers.ProductController;
 import Models.Product;
 import Models.SelectOption;
+import Presentacion.DashboardJFrame;
+import Presentacion.DashboardWindowSupport;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -466,6 +468,7 @@ public class ProductJPanel extends JPanel {
                             "Operación exitosa",
                             JOptionPane.INFORMATION_MESSAGE
                     );
+                    notifyStockAlertsChanged();
 
                 } catch (Exception ex) {
                     showError(ex.getMessage());
@@ -974,6 +977,14 @@ public class ProductJPanel extends JPanel {
                 "Error",
                 JOptionPane.ERROR_MESSAGE
         );
+    }
+
+    private void notifyStockAlertsChanged() {
+        DashboardJFrame dashboardFrame = DashboardWindowSupport.findDashboardFrame(this);
+
+        if (dashboardFrame != null) {
+            dashboardFrame.triggerStockAlertRefresh();
+        }
     }
 
     private class ActiveActionsRenderer extends JPanel implements TableCellRenderer {

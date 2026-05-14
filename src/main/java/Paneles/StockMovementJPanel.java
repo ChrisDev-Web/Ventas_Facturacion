@@ -3,6 +3,8 @@ package Paneles;
 import Controllers.StockMovementController;
 import Models.SelectOption;
 import Models.StockMovement;
+import Presentacion.DashboardJFrame;
+import Presentacion.DashboardWindowSupport;
 import Presentacion.SectionRefreshable;
 import com.github.lgooddatepicker.components.DatePicker;
 import com.github.lgooddatepicker.components.DatePickerSettings;
@@ -457,6 +459,7 @@ public class StockMovementJPanel extends JPanel implements SectionRefreshable {
                         "Operación exitosa",
                         JOptionPane.INFORMATION_MESSAGE
                 );
+                notifyStockAlertsChanged();
 
             } catch (Exception ex) {
                 showError(ex.getMessage());
@@ -591,6 +594,14 @@ public class StockMovementJPanel extends JPanel implements SectionRefreshable {
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void notifyStockAlertsChanged() {
+        DashboardJFrame dashboardFrame = DashboardWindowSupport.findDashboardFrame(this);
+
+        if (dashboardFrame != null) {
+            dashboardFrame.triggerStockAlertRefresh();
+        }
     }
 
     private class ActionsRenderer extends JPanel implements TableCellRenderer {

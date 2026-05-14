@@ -643,6 +643,10 @@ public class DashboardJPanel extends JPanel implements SectionRefreshable {
             return amber;
         }
 
+        if ("URGENT".equals(value)) {
+            return red.darker();
+        }
+
         if ("SUCCESS".equals(value)) {
             return green;
         }
@@ -657,7 +661,7 @@ public class DashboardJPanel extends JPanel implements SectionRefreshable {
     private FontAwesome alertIcon(String severity) {
         String value = safeText(severity, "INFO").toUpperCase(Locale.ROOT);
 
-        if ("WARNING".equals(value) || "CRITICAL".equals(value)) {
+        if ("WARNING".equals(value) || "CRITICAL".equals(value) || "URGENT".equals(value)) {
             return FontAwesome.EXCLAMATION_TRIANGLE;
         }
 
