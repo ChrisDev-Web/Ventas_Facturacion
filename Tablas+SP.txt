@@ -248,21 +248,6 @@ CREATE TABLE sales (
     FOREIGN KEY (customer_document_type_id) REFERENCES document_types(id_document_type)
 );
 
-CREATE TABLE order_details (
-    id_order_detail INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    id_order INT NOT NULL,
-    id_product INT NOT NULL,
-    quantity INT NOT NULL DEFAULT 0,
-    original_unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    discount_type VARCHAR(20) NOT NULL DEFAULT 'NONE',
-    discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    igv_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    subtotal_before_discount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00
-);
-
 CREATE TABLE orders (
     id_order INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     order_series VARCHAR(10) NOT NULL DEFAULT 'O001',
@@ -291,6 +276,23 @@ CREATE TABLE orders (
     FOREIGN KEY (id_client) REFERENCES clients(id_client),
     FOREIGN KEY (customer_document_type_id) REFERENCES document_types(id_document_type),
     FOREIGN KEY (linked_sale_id) REFERENCES sales(id_sale)
+);
+
+CREATE TABLE order_details (
+    id_order_detail INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    id_order INT NOT NULL,
+    id_product INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    original_unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    discount_type VARCHAR(20) NOT NULL DEFAULT 'NONE',
+    discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    igv_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    subtotal_before_discount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    FOREIGN KEY (id_order) REFERENCES orders(id_order),
+    FOREIGN KEY (id_product) REFERENCES products(id_product)
 );
 
 CREATE TABLE stock_movements (
@@ -990,6 +992,48 @@ BEGIN
     LEFT JOIN provinces p ON p.id_province = c.id_provinces
     LEFT JOIN districts d ON d.id_district = c.id_district
     WHERE c.id_client = p_id_client;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_client_find_active_by_document`(
+    IN p_id_document_type INT,
+    IN p_document_number VARCHAR(30)
+)
+BEGIN
+    DECLARE v_document_number VARCHAR(30) DEFAULT '';
+
+    SET v_document_number = IFNULL(TRIM(p_document_number), '');
+
+    SELECT
+        c.id_client,
+        c.name,
+        c.last_name_paternal,
+        c.last_name_maternal,
+        c.id_document_type,
+        dt.name AS document_type_name,
+        c.document_number,
+        c.phone,
+        c.email,
+        c.address,
+        c.id_regions,
+        r.name AS region_name,
+        c.id_provinces,
+        p.name AS province_name,
+        c.id_district,
+        d.name AS district_name,
+        c.status,
+        c.created_at,
+        c.updated_at,
+        c.deleted_at
+    FROM clients c
+    LEFT JOIN document_types dt ON dt.id_document_type = c.id_document_type
+    LEFT JOIN regions r ON r.id_region = c.id_regions
+    LEFT JOIN provinces p ON p.id_province = c.id_provinces
+    LEFT JOIN districts d ON d.id_district = c.id_district
+    WHERE c.status = 1
+      AND c.deleted_at IS NULL
+      AND c.id_document_type <=> p_id_document_type
+      AND c.document_number = v_document_number
+    LIMIT 1;
 END $$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_client_list_active`(
@@ -2554,6 +2598,20 @@ BEGIN
             OR (UPPER(p_stock_filter) = 'BAJO' AND p.stock > 0 AND p.stock <= 10)
             OR (UPPER(p_stock_filter) = 'AGOTADO' AND p.stock = 0)
       );
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_inventory_metrics`()
+BEGIN
+    SELECT
+        COUNT(*) AS active_products,
+        COALESCE(SUM(stock), 0) AS total_units,
+        COALESCE(SUM(cost * stock), 0) AS total_cost_value,
+        COALESCE(SUM(price * stock), 0) AS total_sale_value,
+        COALESCE(SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END), 0) AS out_of_stock_products,
+        COALESCE(SUM(CASE WHEN stock > 0 AND stock <= 10 THEN 1 ELSE 0 END), 0) AS low_stock_products
+    FROM products
+    WHERE status = 1
+      AND deleted_at IS NULL;
 END $$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_inventory_find_by_id`(
