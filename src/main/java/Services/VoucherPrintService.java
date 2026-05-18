@@ -41,6 +41,8 @@ public class VoucherPrintService {
     private static final int TICKET_WIDTH_MM = 80;
     private static final int TICKET_MARGIN_MM = 4;
     private static final int CONTENT_MAX_CHARS = 30;
+    private static final int DETAIL_NAME_MAX_CHARS = 16;
+    private static final int DETAIL_MIN_AMOUNT_COLUMN = 74;
     private static final Font FONT_TITLE = new Font("SansSerif", Font.BOLD, 13);
     private static final Font FONT_SUBTITLE = new Font("SansSerif", Font.BOLD, 10);
     private static final Font FONT_TEXT = new Font("SansSerif", Font.PLAIN, 9);
@@ -122,7 +124,7 @@ public class VoucherPrintService {
         if (details != null && !details.isEmpty()) {
             for (SaleDetail detail : details) {
                 lineCount += 2;
-                lineCount += estimateWrappedLines(safe(detail.getProductName(), "-"), 22);
+                lineCount += estimateWrappedLines(safe(detail.getProductName(), "-"), DETAIL_NAME_MAX_CHARS);
             }
         } else {
             lineCount += 1;
@@ -359,14 +361,16 @@ public class VoucherPrintService {
 
             g2.setFont(FONT_TEXT_BOLD);
             g2.setColor(Color.BLACK);
-            g2.drawString(quantity, 0, y);
-
-            g2.setFont(FONT_TEXT_BOLD);
             amountWidth = g2.getFontMetrics().stringWidth(amount);
-            g2.drawString(amount, Math.max(0, width - amountWidth), y);
+            int quantityWidth = g2.getFontMetrics().stringWidth(quantity);
+            int nameX = quantityWidth + 10;
+            int amountX = Math.max(nameX + 48, width - Math.max(amountWidth, DETAIL_MIN_AMOUNT_COLUMN));
+            int nameWidth = Math.max(40, amountX - nameX - 8);
 
-            List<String> lines = wrapText(g2, safe(detail.getProductName(), "-"), FONT_TEXT, width - 34);
-            int nameX = 20;
+            g2.drawString(quantity, 0, y);
+            g2.drawString(amount, amountX, y);
+
+            List<String> lines = wrapText(g2, safe(detail.getProductName(), "-"), FONT_TEXT, nameWidth);
 
             for (int i = 0; i < lines.size(); i++) {
                 g2.setFont(FONT_TEXT);
@@ -374,8 +378,10 @@ public class VoucherPrintService {
             }
 
             String unitPrice = "P. unit: S/ " + money(detail.getUnitPrice());
+            g2.setColor(new Color(95, 95, 95));
             y += Math.max(12, lines.size() * 12);
             y = drawTextLine(g2, unitPrice, FONT_SMALL, nameX, y + 10);
+            g2.setColor(Color.BLACK);
             return y;
         }
 

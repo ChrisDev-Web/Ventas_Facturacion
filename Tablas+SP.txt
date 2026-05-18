@@ -248,6 +248,51 @@ CREATE TABLE sales (
     FOREIGN KEY (customer_document_type_id) REFERENCES document_types(id_document_type)
 );
 
+CREATE TABLE order_details (
+    id_order_detail INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    id_order INT NOT NULL,
+    id_product INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    original_unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    discount_type VARCHAR(20) NOT NULL DEFAULT 'NONE',
+    discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    igv_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    subtotal_before_discount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00
+);
+
+CREATE TABLE orders (
+    id_order INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_series VARCHAR(10) NOT NULL DEFAULT 'O001',
+    order_number INT NOT NULL DEFAULT 1,
+    order_code VARCHAR(30) NOT NULL DEFAULT 'O001-00000001',
+    id_user INT NOT NULL,
+    order_date DATETIME NOT NULL,
+    expected_date DATETIME DEFAULT NULL,
+    id_client INT DEFAULT NULL,
+    customer_name VARCHAR(150) DEFAULT NULL,
+    customer_document_type_id INT DEFAULT NULL,
+    customer_document_number VARCHAR(20) DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    igv_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+    linked_sale_id INT DEFAULT NULL,
+    converted_at DATETIME DEFAULT NULL,
+    cancelled_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    deleted_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (id_user) REFERENCES users(id_user),
+    FOREIGN KEY (id_client) REFERENCES clients(id_client),
+    FOREIGN KEY (customer_document_type_id) REFERENCES document_types(id_document_type),
+    FOREIGN KEY (linked_sale_id) REFERENCES sales(id_sale)
+);
+
 CREATE TABLE stock_movements (
     id_stock_movement INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     id_product INT NOT NULL,
@@ -5240,6 +5285,1173 @@ BEGIN
     FROM users
     WHERE status = 1
     ORDER BY user_name ASC;
+END $$
+
+-- SP ORDER
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_brand_options`()
+BEGIN
+    SELECT id_brand AS id, name
+    FROM brands
+    WHERE status = 1
+      AND deleted_at IS NULL
+    ORDER BY name ASC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_cancel`(
+    IN p_id_order INT
+)
+BEGIN
+    DECLARE v_status VARCHAR(20) DEFAULT NULL;
+
+    SELECT status
+    INTO v_status
+    FROM orders
+    WHERE id_order = p_id_order
+      AND deleted_at IS NULL
+    LIMIT 1;
+
+    IF v_status IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se encontro la orden';
+    END IF;
+
+    IF v_status <> 'PENDIENTE' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Solo se pueden anular ordenes pendientes';
+    END IF;
+
+    UPDATE orders
+    SET status = 'ANULADA',
+        cancelled_at = NOW(),
+        updated_at = NOW()
+    WHERE id_order = p_id_order;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_category_options`()
+BEGIN
+    SELECT id_category AS id, name
+    FROM categories
+    WHERE status = 1
+      AND deleted_at IS NULL
+    ORDER BY name ASC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_count`(
+    IN p_search VARCHAR(200),
+    IN p_status VARCHAR(20),
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_search VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '';
+    DECLARE v_status VARCHAR(20) DEFAULT '';
+
+    SET v_search = CONVERT(TRIM(IFNULL(p_search, '')) USING utf8mb4) COLLATE utf8mb4_general_ci;
+    SET v_status = UPPER(TRIM(IFNULL(p_status, '')));
+
+    SELECT COUNT(*) AS total
+    FROM orders o
+    INNER JOIN users u ON u.id_user = o.id_user
+    LEFT JOIN sales s ON s.id_sale = o.linked_sale_id
+    WHERE o.deleted_at IS NULL
+      AND (v_status = '' OR v_status = 'TODAS' OR o.status = v_status)
+      AND (p_date_from IS NULL OR DATE(o.order_date) >= p_date_from)
+      AND (p_date_to IS NULL OR DATE(o.order_date) <= p_date_to)
+      AND (
+            v_search = ''
+            OR o.order_code COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_document_number, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(u.user_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(s.voucher_code, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR CAST(o.total AS CHAR) COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+      );
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_create`(
+    IN p_id_user INT,
+    IN p_expected_date DATETIME,
+    IN p_customer_document_type_id INT,
+    IN p_customer_document_number VARCHAR(20),
+    IN p_notes TEXT,
+    IN p_details_json JSON
+)
+BEGIN
+    DECLARE v_id_order INT;
+    DECLARE v_series VARCHAR(10) DEFAULT 'O001';
+    DECLARE v_number INT;
+    DECLARE v_code VARCHAR(30);
+
+    DECLARE v_id_client INT DEFAULT NULL;
+    DECLARE v_customer_name VARCHAR(150) DEFAULT NULL;
+    DECLARE v_customer_document_type_id INT DEFAULT NULL;
+    DECLARE v_customer_document_number VARCHAR(20) DEFAULT NULL;
+
+    DECLARE v_total DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_subtotal DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_igv DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_discount DECIMAL(10,2) DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id_user = p_id_user
+          AND status = 1
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Usuario no valido';
+    END IF;
+
+    IF p_customer_document_type_id IS NULL OR NOT EXISTS (
+        SELECT 1
+        FROM document_types
+        WHERE id_document_type = p_customer_document_type_id
+          AND status = 1
+          AND deleted_at IS NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Seleccione el tipo de documento del cliente';
+    END IF;
+
+    IF p_customer_document_number IS NULL OR TRIM(p_customer_document_number) = '' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ingrese el numero de documento del cliente';
+    END IF;
+
+    IF p_details_json IS NULL OR JSON_LENGTH(p_details_json) = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Agregue productos a la orden';
+    END IF;
+
+    SELECT
+        c.id_client,
+        LEFT(TRIM(CONCAT_WS(' ', c.name, c.last_name_paternal, c.last_name_maternal)), 150),
+        c.id_document_type,
+        LEFT(TRIM(c.document_number), 20)
+    INTO
+        v_id_client,
+        v_customer_name,
+        v_customer_document_type_id,
+        v_customer_document_number
+    FROM clients c
+    WHERE c.status = 1
+      AND c.deleted_at IS NULL
+      AND c.id_document_type = p_customer_document_type_id
+      AND c.document_number = TRIM(p_customer_document_number)
+    LIMIT 1;
+
+    IF v_id_client IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No existe un cliente activo registrado con ese documento';
+    END IF;
+
+    SELECT IFNULL(MAX(order_number), 0) + 1
+    INTO v_number
+    FROM orders
+    WHERE order_series = v_series;
+
+    SET v_code = CONCAT(v_series, '-', LPAD(v_number, 8, '0'));
+
+    CREATE TEMPORARY TABLE IF NOT EXISTS tmp_order_details (
+        id_product INT,
+        quantity INT,
+        discount_type VARCHAR(20),
+        discount_value DECIMAL(10,2),
+        product_price DECIMAL(10,2),
+        product_stock INT,
+        subtotal_before_discount DECIMAL(10,2),
+        discount_amount DECIMAL(10,2),
+        line_total DECIMAL(10,2),
+        line_subtotal DECIMAL(10,2),
+        line_igv DECIMAL(10,2),
+        unit_price DECIMAL(10,2)
+    );
+
+    DELETE FROM tmp_order_details;
+
+    INSERT INTO tmp_order_details (
+        id_product,
+        quantity,
+        discount_type,
+        discount_value
+    )
+    SELECT
+        jt.id_product,
+        jt.quantity,
+        UPPER(IFNULL(jt.discount_type, 'NONE')),
+        IFNULL(jt.discount_value, 0)
+    FROM JSON_TABLE(
+        p_details_json,
+        '$[*]'
+        COLUMNS (
+            id_product INT PATH '$.id_product',
+            quantity INT PATH '$.quantity',
+            discount_type VARCHAR(20) PATH '$.discount_type',
+            discount_value DECIMAL(10,2) PATH '$.discount_value'
+        )
+    ) jt;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details
+        WHERE id_product IS NULL
+           OR quantity IS NULL
+           OR quantity <= 0
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La orden tiene productos invalidos';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details t
+        LEFT JOIN products p ON p.id_product = t.id_product
+        WHERE p.id_product IS NULL
+           OR p.status <> 1
+           OR p.deleted_at IS NOT NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Uno o mas productos no estan disponibles';
+    END IF;
+
+    UPDATE tmp_order_details t
+    INNER JOIN products p ON p.id_product = t.id_product
+    SET t.product_price = p.price,
+        t.product_stock = p.stock;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details
+        WHERE quantity > product_stock
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Stock insuficiente en uno o mas productos';
+    END IF;
+
+    UPDATE tmp_order_details
+    SET subtotal_before_discount = ROUND(product_price * quantity, 2);
+
+    UPDATE tmp_order_details
+    SET discount_amount = CASE
+        WHEN discount_type = 'PERCENT' THEN ROUND(subtotal_before_discount * discount_value / 100, 2)
+        WHEN discount_type = 'FIXED' THEN discount_value
+        ELSE 0
+    END;
+
+    UPDATE tmp_order_details
+    SET discount_amount = CASE
+        WHEN discount_amount < 0 THEN 0
+        WHEN discount_amount > subtotal_before_discount THEN subtotal_before_discount
+        ELSE discount_amount
+    END;
+
+    UPDATE tmp_order_details
+    SET
+        line_total = ROUND(subtotal_before_discount - discount_amount, 2),
+        unit_price = ROUND((subtotal_before_discount - discount_amount) / quantity, 2);
+
+    UPDATE tmp_order_details
+    SET
+        line_subtotal = ROUND(line_total / 1.18, 2),
+        line_igv = ROUND(line_total - ROUND(line_total / 1.18, 2), 2);
+
+    SELECT
+        ROUND(SUM(line_total), 2),
+        ROUND(SUM(line_subtotal), 2),
+        ROUND(SUM(line_igv), 2),
+        ROUND(SUM(discount_amount), 2)
+    INTO
+        v_total,
+        v_subtotal,
+        v_igv,
+        v_discount
+    FROM tmp_order_details;
+
+    INSERT INTO orders (
+        order_series,
+        order_number,
+        order_code,
+        id_user,
+        order_date,
+        expected_date,
+        id_client,
+        customer_name,
+        customer_document_type_id,
+        customer_document_number,
+        notes,
+        subtotal,
+        discount_amount,
+        igv_amount,
+        total,
+        status,
+        linked_sale_id,
+        converted_at,
+        cancelled_at,
+        created_at,
+        updated_at,
+        deleted_at
+    )
+    VALUES (
+        v_series,
+        v_number,
+        v_code,
+        p_id_user,
+        NOW(),
+        p_expected_date,
+        v_id_client,
+        v_customer_name,
+        v_customer_document_type_id,
+        v_customer_document_number,
+        NULLIF(TRIM(p_notes), ''),
+        v_subtotal,
+        v_discount,
+        v_igv,
+        v_total,
+        'PENDIENTE',
+        NULL,
+        NULL,
+        NULL,
+        NOW(),
+        NULL,
+        NULL
+    );
+
+    SET v_id_order = LAST_INSERT_ID();
+
+    INSERT INTO order_details (
+        id_order,
+        id_product,
+        quantity,
+        original_unit_price,
+        discount_type,
+        discount_value,
+        discount_amount,
+        igv_amount,
+        unit_price,
+        subtotal_before_discount,
+        subtotal
+    )
+    SELECT
+        v_id_order,
+        id_product,
+        quantity,
+        product_price,
+        discount_type,
+        discount_value,
+        discount_amount,
+        line_igv,
+        unit_price,
+        subtotal_before_discount,
+        line_total
+    FROM tmp_order_details;
+
+    COMMIT;
+
+    SELECT
+        v_id_order AS id_order,
+        v_code AS order_code,
+        v_total AS total,
+        'PENDIENTE' AS status;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_convert_to_sale`(
+    IN p_id_order INT,
+    IN p_id_user INT,
+    IN p_id_payment_method INT,
+    IN p_document_kind VARCHAR(20),
+    IN p_paid_amount DECIMAL(10,2)
+)
+BEGIN
+    DECLARE v_id_sale INT;
+    DECLARE v_document_kind VARCHAR(20);
+    DECLARE v_document_label VARCHAR(100);
+    DECLARE v_series VARCHAR(10);
+    DECLARE v_number INT;
+    DECLARE v_code VARCHAR(30);
+
+    DECLARE v_order_status VARCHAR(20);
+    DECLARE v_id_client INT DEFAULT NULL;
+    DECLARE v_customer_name VARCHAR(150) DEFAULT NULL;
+    DECLARE v_customer_document_type_id INT DEFAULT NULL;
+    DECLARE v_customer_document_number VARCHAR(20) DEFAULT NULL;
+
+    DECLARE v_total DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_subtotal DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_igv DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_discount DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_change DECIMAL(10,2) DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    SELECT
+        o.status,
+        o.id_client,
+        o.customer_name,
+        o.customer_document_type_id,
+        o.customer_document_number
+    INTO
+        v_order_status,
+        v_id_client,
+        v_customer_name,
+        v_customer_document_type_id,
+        v_customer_document_number
+    FROM orders o
+    WHERE o.id_order = p_id_order
+      AND o.deleted_at IS NULL
+    LIMIT 1;
+
+    IF v_order_status IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se encontro la orden';
+    END IF;
+
+    IF v_order_status <> 'PENDIENTE' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Solo se pueden convertir ordenes pendientes';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id_user = p_id_user
+          AND status = 1
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Usuario no valido';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM payment_methods
+        WHERE id_payment_method = p_id_payment_method
+          AND status = 1
+          AND deleted_at IS NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Metodo de pago no valido';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM order_details
+        WHERE id_order = p_id_order
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La orden no tiene productos';
+    END IF;
+
+    SET v_document_kind = UPPER(TRIM(IFNULL(p_document_kind, 'TICKET')));
+
+    IF v_document_kind = 'BOLETA' THEN
+        SET v_series = 'B001';
+        SET v_document_label = 'Boleta de venta';
+    ELSEIF v_document_kind = 'FACTURA' THEN
+        SET v_series = 'F001';
+        SET v_document_label = 'Factura de venta';
+    ELSE
+        SET v_document_kind = 'TICKET';
+        SET v_series = 'T001';
+        SET v_document_label = 'Ticket de venta';
+    END IF;
+
+    IF v_document_kind IN ('BOLETA', 'FACTURA') THEN
+        IF v_customer_document_type_id IS NULL OR v_customer_document_number IS NULL THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'La orden no tiene un cliente valido para emitir comprobante';
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM clients c
+            WHERE c.id_client = v_id_client
+              AND c.status = 1
+              AND c.deleted_at IS NULL
+              AND c.id_document_type = v_customer_document_type_id
+              AND c.document_number = v_customer_document_number
+        ) THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'El cliente de la orden ya no esta disponible para facturar';
+        END IF;
+    ELSE
+        SET v_id_client = NULL;
+        SET v_customer_name = NULL;
+        SET v_customer_document_type_id = NULL;
+        SET v_customer_document_number = NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM order_details od
+        INNER JOIN products p ON p.id_product = od.id_product
+        WHERE od.id_order = p_id_order
+          AND (
+                p.status <> 1
+                OR p.deleted_at IS NOT NULL
+                OR od.quantity > p.stock
+          )
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Uno o mas productos de la orden ya no tienen stock suficiente';
+    END IF;
+
+    SELECT IFNULL(MAX(voucher_number), 0) + 1
+    INTO v_number
+    FROM sales
+    WHERE voucher_series = v_series;
+
+    SET v_code = CONCAT(v_series, '-', LPAD(v_number, 8, '0'));
+
+    SELECT
+        ROUND(SUM(od.subtotal), 2),
+        ROUND(SUM(od.subtotal_before_discount), 2),
+        ROUND(SUM(od.igv_amount), 2),
+        ROUND(SUM(od.discount_amount), 2)
+    INTO
+        v_total,
+        v_subtotal,
+        v_igv,
+        v_discount
+    FROM order_details od
+    WHERE od.id_order = p_id_order;
+
+    IF p_paid_amount IS NULL OR p_paid_amount < v_total THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El monto pagado no puede ser menor al total';
+    END IF;
+
+    SET v_change = ROUND(p_paid_amount - v_total, 2);
+
+    INSERT INTO sales (
+        id_user,
+        id_payment_method,
+        sale_date,
+        document_kind,
+        document_label,
+        voucher_series,
+        voucher_number,
+        voucher_code,
+        id_client,
+        customer_name,
+        customer_document_type_id,
+        customer_document_number,
+        subtotal,
+        discount_amount,
+        igv_amount,
+        total,
+        paid_amount,
+        change_amount,
+        status,
+        created_at,
+        updated_at,
+        deleted_at
+    )
+    SELECT
+        p_id_user,
+        p_id_payment_method,
+        NOW(),
+        v_document_kind,
+        v_document_label,
+        v_series,
+        v_number,
+        v_code,
+        v_id_client,
+        v_customer_name,
+        v_customer_document_type_id,
+        v_customer_document_number,
+        v_subtotal,
+        v_discount,
+        v_igv,
+        v_total,
+        p_paid_amount,
+        v_change,
+        1,
+        NOW(),
+        NULL,
+        NULL
+    FROM orders o
+    WHERE o.id_order = p_id_order;
+
+    SET v_id_sale = LAST_INSERT_ID();
+
+    INSERT INTO sale_details (
+        id_sale,
+        id_product,
+        quantity,
+        original_unit_price,
+        discount_type,
+        discount_value,
+        discount_amount,
+        igv_amount,
+        unit_price,
+        subtotal_before_discount,
+        subtotal
+    )
+    SELECT
+        v_id_sale,
+        od.id_product,
+        od.quantity,
+        od.original_unit_price,
+        od.discount_type,
+        od.discount_value,
+        od.discount_amount,
+        od.igv_amount,
+        od.unit_price,
+        od.subtotal_before_discount,
+        od.subtotal
+    FROM order_details od
+    WHERE od.id_order = p_id_order;
+
+    UPDATE products p
+    INNER JOIN order_details od ON od.id_product = p.id_product
+    SET p.stock = p.stock - od.quantity,
+        p.updated_at = NOW()
+    WHERE od.id_order = p_id_order;
+
+    INSERT INTO stock_movements (
+        id_product,
+        movement_type,
+        quantity,
+        description,
+        reference,
+        reference_id,
+        movement_date
+    )
+    SELECT
+        od.id_product,
+        'SALIDA',
+        od.quantity,
+        CONCAT('Salida por conversion de orden ', (SELECT order_code FROM orders WHERE id_order = p_id_order LIMIT 1)),
+        'ORDER',
+        p_id_order,
+        NOW()
+    FROM order_details od
+    WHERE od.id_order = p_id_order;
+
+    UPDATE orders
+    SET status = 'CONVERTIDA',
+        linked_sale_id = v_id_sale,
+        converted_at = NOW(),
+        updated_at = NOW()
+    WHERE id_order = p_id_order;
+
+    COMMIT;
+
+    SELECT
+        v_id_sale AS id_sale,
+        v_code AS voucher_code,
+        v_total AS total,
+        v_change AS change_amount;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_detail_list`(
+    IN p_id_order INT
+)
+BEGIN
+    SELECT
+        od.id_order_detail,
+        od.id_order,
+        od.id_product,
+        p.name AS product_name,
+        od.quantity,
+        od.original_unit_price,
+        od.discount_type,
+        od.discount_value,
+        od.discount_amount,
+        od.igv_amount,
+        od.unit_price,
+        od.subtotal_before_discount,
+        od.subtotal
+    FROM order_details od
+    INNER JOIN products p ON p.id_product = od.id_product
+    WHERE od.id_order = p_id_order
+    ORDER BY od.id_order_detail ASC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_document_type_options`()
+BEGIN
+    SELECT id_document_type AS id, name
+    FROM document_types
+    WHERE status = 1
+      AND deleted_at IS NULL
+    ORDER BY name ASC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_find_by_id`(
+    IN p_id_order INT
+)
+BEGIN
+    SELECT
+        o.id_order,
+        o.order_series,
+        o.order_number,
+        o.order_code,
+        o.id_user,
+        u.user_name,
+        o.order_date,
+        o.expected_date,
+        o.id_client,
+        o.customer_name,
+        o.customer_document_type_id,
+        dt.name AS customer_document_type_name,
+        o.customer_document_number,
+        o.notes,
+        o.subtotal,
+        o.discount_amount,
+        o.igv_amount,
+        o.total,
+        o.status,
+        o.linked_sale_id,
+        s.voucher_code AS linked_voucher_code,
+        o.converted_at,
+        o.cancelled_at,
+        o.created_at,
+        o.updated_at,
+        o.deleted_at
+    FROM orders o
+    INNER JOIN users u
+        ON u.id_user = o.id_user
+    LEFT JOIN document_types dt
+        ON dt.id_document_type = o.customer_document_type_id
+    LEFT JOIN sales s
+        ON s.id_sale = o.linked_sale_id
+    WHERE o.id_order = p_id_order
+      AND o.deleted_at IS NULL
+    LIMIT 1;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_list`(
+    IN p_search VARCHAR(200),
+    IN p_status VARCHAR(20),
+    IN p_date_from DATE,
+    IN p_date_to DATE,
+    IN p_page INT,
+    IN p_limit INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+    DECLARE v_search VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '';
+    DECLARE v_status VARCHAR(20) DEFAULT '';
+
+    SET v_search = CONVERT(TRIM(IFNULL(p_search, '')) USING utf8mb4) COLLATE utf8mb4_general_ci;
+    SET v_status = UPPER(TRIM(IFNULL(p_status, '')));
+
+    IF p_page IS NULL OR p_page < 1 THEN
+        SET p_page = 1;
+    END IF;
+
+    IF p_limit NOT IN (10, 20, 50) THEN
+        SET p_limit = 10;
+    END IF;
+
+    SET v_offset = (p_page - 1) * p_limit;
+
+    SELECT
+        o.id_order,
+        o.order_series,
+        o.order_number,
+        o.order_code,
+        o.id_user,
+        u.user_name,
+        o.order_date,
+        o.expected_date,
+        o.id_client,
+        o.customer_name,
+        o.customer_document_type_id,
+        dt.name AS customer_document_type_name,
+        o.customer_document_number,
+        o.notes,
+        o.subtotal,
+        o.discount_amount,
+        o.igv_amount,
+        o.total,
+        o.status,
+        o.linked_sale_id,
+        s.voucher_code AS linked_voucher_code,
+        o.converted_at,
+        o.cancelled_at,
+        o.created_at,
+        o.updated_at,
+        o.deleted_at
+    FROM orders o
+    INNER JOIN users u
+        ON u.id_user = o.id_user
+    LEFT JOIN document_types dt
+        ON dt.id_document_type = o.customer_document_type_id
+    LEFT JOIN sales s
+        ON s.id_sale = o.linked_sale_id
+    WHERE o.deleted_at IS NULL
+      AND (v_status = '' OR v_status = 'TODAS' OR o.status = v_status)
+      AND (p_date_from IS NULL OR DATE(o.order_date) >= p_date_from)
+      AND (p_date_to IS NULL OR DATE(o.order_date) <= p_date_to)
+      AND (
+            v_search = ''
+            OR o.order_code COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_document_number, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(u.user_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(s.voucher_code, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR CAST(o.total AS CHAR) COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+      )
+    ORDER BY o.id_order DESC
+    LIMIT v_offset, p_limit;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_payment_method_options`()
+BEGIN
+    SELECT id_payment_method AS id, name
+    FROM payment_methods
+    WHERE status = 1
+      AND deleted_at IS NULL
+    ORDER BY name ASC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_product_catalog`(
+    IN p_search VARCHAR(200),
+    IN p_id_category INT,
+    IN p_id_brand INT
+)
+BEGIN
+    SELECT
+        p.id_product,
+        p.name,
+        p.description,
+        p.price,
+        p.stock,
+        p.image,
+        p.id_category,
+        c.name AS category_name,
+        p.id_brand,
+        b.name AS brand_name
+    FROM products p
+    INNER JOIN categories c ON c.id_category = p.id_category
+    INNER JOIN brands b ON b.id_brand = p.id_brand
+    WHERE p.status = 1
+      AND p.deleted_at IS NULL
+      AND p.stock > 0
+      AND (p_id_category IS NULL OR p_id_category = 0 OR p.id_category = p_id_category)
+      AND (p_id_brand IS NULL OR p_id_brand = 0 OR p.id_brand = p_id_brand)
+      AND (
+            p_search IS NULL
+            OR TRIM(p_search) = ''
+            OR p.name LIKE CONCAT('%', TRIM(p_search), '%')
+            OR p.description LIKE CONCAT('%', TRIM(p_search), '%')
+            OR c.name LIKE CONCAT('%', TRIM(p_search), '%')
+            OR b.name LIKE CONCAT('%', TRIM(p_search), '%')
+      )
+    ORDER BY p.id_product DESC;
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_stats`(
+    IN p_search VARCHAR(200),
+    IN p_status VARCHAR(20),
+    IN p_date_from DATE,
+    IN p_date_to DATE
+)
+BEGIN
+    DECLARE v_search VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '';
+    DECLARE v_status VARCHAR(20) DEFAULT '';
+
+    SET v_search = CONVERT(TRIM(IFNULL(p_search, '')) USING utf8mb4) COLLATE utf8mb4_general_ci;
+    SET v_status = UPPER(TRIM(IFNULL(p_status, '')));
+
+    SELECT
+        COALESCE(SUM(CASE WHEN o.status = 'PENDIENTE' THEN 1 ELSE 0 END), 0) AS pending_count,
+        COALESCE(SUM(CASE WHEN o.status = 'CONVERTIDA' THEN 1 ELSE 0 END), 0) AS converted_count,
+        COALESCE(SUM(CASE WHEN o.status = 'ANULADA' THEN 1 ELSE 0 END), 0) AS cancelled_count,
+        COALESCE(SUM(CASE WHEN o.status = 'PENDIENTE' THEN o.total ELSE 0 END), 0) AS pending_amount
+    FROM orders o
+    INNER JOIN users u ON u.id_user = o.id_user
+    LEFT JOIN sales s ON s.id_sale = o.linked_sale_id
+    WHERE o.deleted_at IS NULL
+      AND (v_status = '' OR v_status = 'TODAS' OR o.status = v_status)
+      AND (p_date_from IS NULL OR DATE(o.order_date) >= p_date_from)
+      AND (p_date_to IS NULL OR DATE(o.order_date) <= p_date_to)
+      AND (
+            v_search = ''
+            OR o.order_code COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(o.customer_document_number, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(u.user_name, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR IFNULL(s.voucher_code, '') COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+            OR CAST(o.total AS CHAR) COLLATE utf8mb4_general_ci LIKE CONCAT('%', v_search, '%')
+      );
+END $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_order_update`(
+    IN p_id_order INT,
+    IN p_id_user INT,
+    IN p_expected_date DATETIME,
+    IN p_customer_document_type_id INT,
+    IN p_customer_document_number VARCHAR(20),
+    IN p_notes TEXT,
+    IN p_details_json JSON
+)
+BEGIN
+    DECLARE v_current_status VARCHAR(20) DEFAULT NULL;
+    DECLARE v_id_client INT DEFAULT NULL;
+    DECLARE v_customer_name VARCHAR(150) DEFAULT NULL;
+    DECLARE v_customer_document_type_id INT DEFAULT NULL;
+    DECLARE v_customer_document_number VARCHAR(20) DEFAULT NULL;
+
+    DECLARE v_total DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_subtotal DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_igv DECIMAL(10,2) DEFAULT 0;
+    DECLARE v_discount DECIMAL(10,2) DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    SELECT status
+    INTO v_current_status
+    FROM orders
+    WHERE id_order = p_id_order
+      AND deleted_at IS NULL
+    LIMIT 1;
+
+    IF v_current_status IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se encontro la orden';
+    END IF;
+
+    IF v_current_status <> 'PENDIENTE' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Solo se pueden editar ordenes pendientes';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id_user = p_id_user
+          AND status = 1
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Usuario no valido';
+    END IF;
+
+    IF p_customer_document_type_id IS NULL OR NOT EXISTS (
+        SELECT 1
+        FROM document_types
+        WHERE id_document_type = p_customer_document_type_id
+          AND status = 1
+          AND deleted_at IS NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Seleccione el tipo de documento del cliente';
+    END IF;
+
+    IF p_customer_document_number IS NULL OR TRIM(p_customer_document_number) = '' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ingrese el numero de documento del cliente';
+    END IF;
+
+    IF p_details_json IS NULL OR JSON_LENGTH(p_details_json) = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Agregue productos a la orden';
+    END IF;
+
+    SELECT
+        c.id_client,
+        LEFT(TRIM(CONCAT_WS(' ', c.name, c.last_name_paternal, c.last_name_maternal)), 150),
+        c.id_document_type,
+        LEFT(TRIM(c.document_number), 20)
+    INTO
+        v_id_client,
+        v_customer_name,
+        v_customer_document_type_id,
+        v_customer_document_number
+    FROM clients c
+    WHERE c.status = 1
+      AND c.deleted_at IS NULL
+      AND c.id_document_type = p_customer_document_type_id
+      AND c.document_number = TRIM(p_customer_document_number)
+    LIMIT 1;
+
+    IF v_id_client IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No existe un cliente activo registrado con ese documento';
+    END IF;
+
+    CREATE TEMPORARY TABLE IF NOT EXISTS tmp_order_details (
+        id_product INT,
+        quantity INT,
+        discount_type VARCHAR(20),
+        discount_value DECIMAL(10,2),
+        product_price DECIMAL(10,2),
+        product_stock INT,
+        subtotal_before_discount DECIMAL(10,2),
+        discount_amount DECIMAL(10,2),
+        line_total DECIMAL(10,2),
+        line_subtotal DECIMAL(10,2),
+        line_igv DECIMAL(10,2),
+        unit_price DECIMAL(10,2)
+    );
+
+    DELETE FROM tmp_order_details;
+
+    INSERT INTO tmp_order_details (
+        id_product,
+        quantity,
+        discount_type,
+        discount_value
+    )
+    SELECT
+        jt.id_product,
+        jt.quantity,
+        UPPER(IFNULL(jt.discount_type, 'NONE')),
+        IFNULL(jt.discount_value, 0)
+    FROM JSON_TABLE(
+        p_details_json,
+        '$[*]'
+        COLUMNS (
+            id_product INT PATH '$.id_product',
+            quantity INT PATH '$.quantity',
+            discount_type VARCHAR(20) PATH '$.discount_type',
+            discount_value DECIMAL(10,2) PATH '$.discount_value'
+        )
+    ) jt;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details
+        WHERE id_product IS NULL
+           OR quantity IS NULL
+           OR quantity <= 0
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La orden tiene productos invalidos';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details t
+        LEFT JOIN products p ON p.id_product = t.id_product
+        WHERE p.id_product IS NULL
+           OR p.status <> 1
+           OR p.deleted_at IS NOT NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Uno o mas productos no estan disponibles';
+    END IF;
+
+    UPDATE tmp_order_details t
+    INNER JOIN products p ON p.id_product = t.id_product
+    SET t.product_price = p.price,
+        t.product_stock = p.stock;
+
+    IF EXISTS (
+        SELECT 1
+        FROM tmp_order_details
+        WHERE quantity > product_stock
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Stock insuficiente en uno o mas productos';
+    END IF;
+
+    UPDATE tmp_order_details
+    SET subtotal_before_discount = ROUND(product_price * quantity, 2);
+
+    UPDATE tmp_order_details
+    SET discount_amount = CASE
+        WHEN discount_type = 'PERCENT' THEN ROUND(subtotal_before_discount * discount_value / 100, 2)
+        WHEN discount_type = 'FIXED' THEN discount_value
+        ELSE 0
+    END;
+
+    UPDATE tmp_order_details
+    SET discount_amount = CASE
+        WHEN discount_amount < 0 THEN 0
+        WHEN discount_amount > subtotal_before_discount THEN subtotal_before_discount
+        ELSE discount_amount
+    END;
+
+    UPDATE tmp_order_details
+    SET
+        line_total = ROUND(subtotal_before_discount - discount_amount, 2),
+        unit_price = ROUND((subtotal_before_discount - discount_amount) / quantity, 2);
+
+    UPDATE tmp_order_details
+    SET
+        line_subtotal = ROUND(line_total / 1.18, 2),
+        line_igv = ROUND(line_total - ROUND(line_total / 1.18, 2), 2);
+
+    SELECT
+        ROUND(SUM(line_total), 2),
+        ROUND(SUM(line_subtotal), 2),
+        ROUND(SUM(line_igv), 2),
+        ROUND(SUM(discount_amount), 2)
+    INTO
+        v_total,
+        v_subtotal,
+        v_igv,
+        v_discount
+    FROM tmp_order_details;
+
+    UPDATE orders
+    SET id_user = p_id_user,
+        expected_date = p_expected_date,
+        id_client = v_id_client,
+        customer_name = v_customer_name,
+        customer_document_type_id = v_customer_document_type_id,
+        customer_document_number = v_customer_document_number,
+        notes = NULLIF(TRIM(p_notes), ''),
+        subtotal = v_subtotal,
+        discount_amount = v_discount,
+        igv_amount = v_igv,
+        total = v_total,
+        updated_at = NOW()
+    WHERE id_order = p_id_order;
+
+    DELETE FROM order_details
+    WHERE id_order = p_id_order;
+
+    INSERT INTO order_details (
+        id_order,
+        id_product,
+        quantity,
+        original_unit_price,
+        discount_type,
+        discount_value,
+        discount_amount,
+        igv_amount,
+        unit_price,
+        subtotal_before_discount,
+        subtotal
+    )
+    SELECT
+        p_id_order,
+        id_product,
+        quantity,
+        product_price,
+        discount_type,
+        discount_value,
+        discount_amount,
+        line_igv,
+        unit_price,
+        subtotal_before_discount,
+        line_total
+    FROM tmp_order_details;
+
+    COMMIT;
 END $$
 
 DELIMITER ;

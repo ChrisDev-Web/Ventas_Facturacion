@@ -5,6 +5,7 @@ import Models.Product;
 import Models.SelectOption;
 import Presentacion.DashboardJFrame;
 import Presentacion.DashboardWindowSupport;
+import Presentacion.SectionRefreshable;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -45,7 +46,7 @@ import javax.swing.table.TableCellRenderer;
 import jiconfont.icons.font_awesome.FontAwesome;
 import jiconfont.swing.IconFontSwing;
 
-public class ProductJPanel extends JPanel {
+public class ProductJPanel extends JPanel implements SectionRefreshable {
 
     private final ProductController controller;
 
@@ -984,6 +985,15 @@ public class ProductJPanel extends JPanel {
 
         if (dashboardFrame != null) {
             dashboardFrame.triggerStockAlertRefresh();
+        }
+    }
+
+    @Override
+    public void refreshSectionData() {
+        loadTable();
+
+        if (inactiveDialog != null && inactiveDialog.isShowing()) {
+            loadInactiveTable();
         }
     }
 

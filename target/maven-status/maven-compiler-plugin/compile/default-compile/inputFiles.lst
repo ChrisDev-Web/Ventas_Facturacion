@@ -12,6 +12,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Contr
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\EmployeeController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\InventoryController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\LocationController.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\OrderController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\PaymentMethodController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\ProductController.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Controllers\RoleController.java
@@ -28,6 +29,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\D
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\EmployeeDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\InventoryDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\LocationDAO.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\OrderDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\PaymentMethodDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\ProductDAO.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\DAO\RoleDAO.java
@@ -47,6 +49,9 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Model
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\InventoryMetrics.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\InventoryProduct.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\LocationItem.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Order.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\OrderDetail.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\OrderStats.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\PaymentMethod.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\Product.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Models\ReniecPerson.java
@@ -73,6 +78,7 @@ C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Panel
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\EmployeeJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\InventoryJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\LocationJPanel.java
+C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\OrderJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\PaymentMethodJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\ProductJPanel.java
 C:\Users\crist\Documents\NetBeansProjects\Ventas_Facturacion\src\main\java\Paneles\ProfileJPanel.java

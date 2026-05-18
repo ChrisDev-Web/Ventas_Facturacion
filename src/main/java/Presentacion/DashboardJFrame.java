@@ -8,6 +8,7 @@ import Paneles.UserJPanel;
 import Paneles.SupplierJPanel;
 import Paneles.AlertsJPanel;
 import Paneles.LocationJPanel;
+import Paneles.OrderJPanel;
 import Paneles.SaleHistoryJPanel;
 import Paneles.ProductJPanel;
 import Paneles.CatalogJPanel;
@@ -91,6 +92,7 @@ public class DashboardJFrame extends JFrame {
     private SideMenuItem itemDashboard;
     private SideMenuItem itemAlertas;
     private SideMenuItem itemVentas;
+    private SideMenuItem itemOrdenes;
     private SideMenuItem itemHistorialVentas;
     private SideMenuItem itemProductos;
     private SideMenuItem itemInventario;
@@ -341,6 +343,7 @@ public class DashboardJFrame extends JFrame {
         itemDashboard = createMenuItem(FontAwesome.HOME, "Dashboard", false);
         itemAlertas = createMenuItem(FontAwesome.BELL, "Alertas", false);
         itemVentas = createMenuItem(FontAwesome.SHOPPING_CART, "Ventas", false);
+        itemOrdenes = createMenuItem(FontAwesome.CLIPBOARD, "Ordenes", false);
         itemHistorialVentas = createMenuItem(FontAwesome.LIST_ALT, "Historial Ventas", false);
         itemProductos = createMenuItem(FontAwesome.CUBE, "Productos", false);
         itemInventario = createMenuItem(FontAwesome.ARCHIVE, "Inventario", false);
@@ -355,6 +358,7 @@ public class DashboardJFrame extends JFrame {
         itemDashboard.addClickAction(() -> showSection("DASHBOARD", itemDashboard));
         itemAlertas.addClickAction(() -> showSection("ALERTAS", itemAlertas));
         itemVentas.addClickAction(() -> showSection("VENTAS", itemVentas));
+        itemOrdenes.addClickAction(() -> showSection("ORDENES", itemOrdenes));
         itemHistorialVentas.addClickAction(() -> showSection("HISTORIAL_VENTAS", itemHistorialVentas));
         itemProductos.addClickAction(() -> showSection("PRODUCTOS", itemProductos));
         itemInventario.addClickAction(() -> showSection("INVENTARIO", itemInventario));
@@ -371,6 +375,8 @@ public class DashboardJFrame extends JFrame {
         menuContainer.add(itemAlertas);
         menuContainer.add(Box.createVerticalStrut(8));
         menuContainer.add(itemVentas);
+        menuContainer.add(Box.createVerticalStrut(8));
+        menuContainer.add(itemOrdenes);
         menuContainer.add(Box.createVerticalStrut(8));
         menuContainer.add(itemHistorialVentas);
         menuContainer.add(Box.createVerticalStrut(8));
@@ -556,6 +562,7 @@ public class DashboardJFrame extends JFrame {
         contentPanel.add(dashboardPanel, "DASHBOARD");
         contentPanel.add(alertsPanel, "ALERTAS");
         contentPanel.add(new SaleJPanel(getSafeUserId(), getSafeUserName()), "VENTAS");
+        contentPanel.add(new OrderJPanel(getSafeUserId()), "ORDENES");
         contentPanel.add(new SaleHistoryJPanel(), "HISTORIAL_VENTAS");
         contentPanel.add(new ProductJPanel(), "PRODUCTOS");
         contentPanel.add(new InventoryJPanel(), "INVENTARIO");
@@ -616,6 +623,7 @@ public class DashboardJFrame extends JFrame {
 
     public void triggerStockAlertRefresh() {
         requestLowStockAlertSync(true);
+        refreshVisibleSection();
         refreshAlertSectionsIfVisible();
     }
 
